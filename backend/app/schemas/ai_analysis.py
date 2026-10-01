@@ -32,6 +32,10 @@ class AIAnalysisRequest(BaseModel):
     site: Optional[str] = None
     report_date: Optional[str] = None
     additional_context: Optional[Union[str, List[str]]] = None
+    incident_latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    incident_longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    incident_address: Optional[str] = None
+    incident_location_name: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -79,6 +83,12 @@ class AIAnalysisExecuteResponse(BaseModel):
     weak_signal_reason: Optional[str] = None
     related_reports: Optional[List[Dict[str, Any]]] = []
     escalation_path: Optional[str] = None
+
+    # Incident Location Fields
+    incident_latitude: Optional[float] = None
+    incident_longitude: Optional[float] = None
+    incident_address: Optional[str] = None
+    incident_location_name: Optional[str] = None
     
     # Hybrid SIF Decision Engine Fields
     ai_classification: Optional[str] = None
