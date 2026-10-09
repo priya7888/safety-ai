@@ -40,6 +40,9 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import FullAnalysisModal from './FullAnalysisModal';
+import IncidentLocationModal from './maps/IncidentLocationModal';
+import IncidentPostAnalysisMap from './maps/IncidentPostAnalysisMap';
+import AdminNavigationModal from './maps/AdminNavigationModal';
 import { 
   addReportRecord, 
   addWeakSignalToBoard, 
@@ -58,28 +61,52 @@ const AVAILABLE_UPLOADED_REPORTS = [
     name: 'Main Pipeline High-Pressure Gas Leakage',
     type: 'NEAR_MISS',
     location: 'Unit 1',
-    text: 'High-pressure gas pipeline flange developed severe leakage. Gas alarm at 65% LEL near switch.'
+    text: 'High-pressure gas pipeline flange developed severe leakage. Gas alarm at 65% LEL near switch.',
+    incidentLocation: {
+      latitude: 12.9716,
+      longitude: 77.5946,
+      name: 'Crude Distillation Unit (CDU)',
+      address: 'Crude Distillation Unit (Operating Sector, Primary Refining)'
+    }
   },
   {
     ref: 'OIL-BATCH-02',
     name: 'Electrical Switchboard Fire and Smoke Outbreak',
     type: 'NEAR_MISS',
     location: 'Unit 2',
-    text: 'Electrical fire erupted in distribution board due to overloaded breaker with open flames visible.'
+    text: 'Electrical fire erupted in distribution board due to overloaded breaker with open flames visible.',
+    incidentLocation: {
+      latitude: 12.9735,
+      longitude: 77.5938,
+      name: 'Electrical Substation 02 (415V Panel)',
+      address: 'Electrical Substation 02, Utilities Sector'
+    }
   },
   {
     ref: 'OIL-BATCH-03',
     name: 'Storage Shed LPG Gas Cylinder Valve Leakage',
     type: 'UNSAFE_CONDITION',
     location: 'Unit 3',
-    text: 'Pressurized LPG cylinder valve found leaking flammable propane gas inside storage shed.'
+    text: 'Pressurized LPG cylinder valve found leaking flammable propane gas inside storage shed.',
+    incidentLocation: {
+      latitude: 12.9680,
+      longitude: 77.5920,
+      name: 'LPG Storage Farm & Cylinder Shed',
+      address: 'LPG Storage Farm, Pressurized Vessels Sector'
+    }
   },
   {
     ref: 'OIL-BATCH-04',
     name: 'Hot Work Welding Sparks Floor Flash Fire',
     type: 'UNSAFE_ACT',
     location: 'Unit 4',
-    text: 'Welding sparks near solvent drum ignited oily rags on the floor causing an immediate flash fire.'
+    text: 'Welding sparks near solvent drum ignited oily rags on the floor causing an immediate flash fire.',
+    incidentLocation: {
+      latitude: 12.9705,
+      longitude: 77.5932,
+      name: 'Fabrication Workshop Bay 4',
+      address: 'Fabrication Workshop Bay 4, Conversion Area'
+    }
   }
 ];
 
@@ -914,6 +941,44 @@ export default function AIAnalysisView() {
   const [expandedHistoricalRecord, setExpandedHistoricalRecord] = useState(null);
   const [totalStoredRecords, setTotalStoredRecords] = useState(getStoredTotalRecords);
 
+  // Separated Location States (Requirement 10 & 12)
+  const [selectedIncidentLocation, setSelectedIncidentLocation] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [adminLocation, setAdminLocation] = useState(null);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [showAdminNavModal, setShowAdminNavModal] = useState(false);
+
+  // Handle Open Map Click with Browser Geolocation Permission (Requirement 2)
+  const handleOpenMapClick = () => {
+    setValidationError('');
+
+    if (!navigator.geolocation) {
+      setShowMapModal(true);
+      return;
+    }
+
+    setIsRequestingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsRequestingLocation(false);
+        const uLoc = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+        // CRITICAL: User's location is ONLY context, NOT saved as incident location
+        setUserLocation(uLoc);
+        setShowMapModal(true);
+      },
+      (error) => {
+        setIsRequestingLocation(false);
+        // On permission denied / timeout / unavailable, still open map for manual selection
+        setShowMapModal(true);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
+
   useEffect(() => {
     // 1. Fetch persisted backend reports on mount so historical weak signals and total records are based on real DB data
     const syncBackendReports = async () => {
@@ -951,6 +1016,14 @@ export default function AIAnalysisView() {
       ...(currentChecklist || []).map((factor) => `- ${factor}`)
     ].filter(Boolean).join('\n');
 
+    // REQUIRE incident location selection before running analysis (Requirement 15)
+    if (!selectedIncidentLocation) {
+      setValidationError('Please select an Incident Location using "Open Map" before running analysis.');
+      setAnalysisResult(null);
+      setIsAnalyzing(false);
+      return;
+    }
+
     // RULE: both checklist and description is not allowed!
     if (text && currentChecklist && currentChecklist.length > 0) {
       setValidationError('Simultaneous submission not allowed: Please provide EITHER a field description OR select checklist factors, but not both.');
@@ -958,7 +1031,6 @@ export default function AIAnalysisView() {
       setIsAnalyzing(false);
       return;
     }
-
     // Only reject when BOTH are empty.
     if (!text && (!currentChecklist || currentChecklist.length === 0)) {
       setValidationError('Please enter a safety observation or select at least one checklist factor.');
@@ -1043,6 +1115,10 @@ export default function AIAnalysisView() {
         operating_unit: loc,
         site: loc === 'Unit 1' ? 'Plant 01' : loc === 'Unit 2' ? 'Plant 02' : loc === 'Unit 3' ? 'Plant 03' : 'Plant 04',
         report_date: reportDate,
+        incident_latitude: selectedIncidentLocation?.latitude,
+        incident_longitude: selectedIncidentLocation?.longitude,
+        incident_address: selectedIncidentLocation?.address,
+        incident_location_name: selectedIncidentLocation?.name,
         ...(currentChecklist.length > 0 ? { additional_context: `Safety Factors: ${currentChecklist.join(', ')}` } : {})
       });
 
@@ -1149,7 +1225,12 @@ export default function AIAnalysisView() {
             weak_signal_title: backendResult.weak_signal_title,
             weak_signal_reason: backendResult.weak_signal_reason,
             related_reports: backendResult.related_reports || [],
-            escalation_path: backendResult.escalation_path
+            escalation_path: backendResult.escalation_path,
+            incident_latitude: backendResult.incident_latitude ?? selectedIncidentLocation?.latitude,
+            incident_longitude: backendResult.incident_longitude ?? selectedIncidentLocation?.longitude,
+            incident_address: backendResult.incident_address || selectedIncidentLocation?.address,
+            incident_location_name: backendResult.incident_location_name || selectedIncidentLocation?.name,
+            incidentLocation: selectedIncidentLocation
           };
 
           setAnalysisResult(finalResult);
@@ -1180,7 +1261,11 @@ export default function AIAnalysisView() {
             reviewer_feedback: null,
             review_status: 'Pending Review',
             created_at: backendResult.created_at || new Date().toISOString(),
-            safety_factors: currentChecklist
+            safety_factors: currentChecklist,
+            incident_latitude: finalResult.incident_latitude,
+            incident_longitude: finalResult.incident_longitude,
+            incident_address: finalResult.incident_address,
+            incident_location_name: finalResult.incident_location_name
           };
 
           syncBackendReportsToStore([reportRecordToSync], [], false);
@@ -1229,6 +1314,7 @@ export default function AIAnalysisView() {
     setLocation('Unit 1');
     setInputMode('DESCRIPTION');
     setChecklistCategoryFilter('ALL');
+    setSelectedIncidentLocation(null);
     setAnalysisResult(null);
     setAnalysisStep('');
     setAutoSavedInfo(null);
@@ -1268,13 +1354,19 @@ export default function AIAnalysisView() {
   const handleRunAnalysis = async () => {
     const trimmedDescription = description.trim();
 
+    // Check Incident Location requirement (Requirement 15)
+    if (!selectedIncidentLocation) {
+      setValidationError('Please select an Incident Location using "Open Map" before running analysis.');
+      setAnalysisResult(null);
+      return;
+    }
+
     // RULE: both checklist and description is not allowed!
     if (trimmedDescription && selectedChecklist && selectedChecklist.length > 0) {
       setValidationError('Simultaneous submission not allowed: Please provide EITHER a field description OR select checklist factors, but not both.');
       setAnalysisResult(null);
       return;
     }
-
     if (!trimmedDescription && (!selectedChecklist || selectedChecklist.length === 0)) {
       setValidationError('Please enter a safety observation or select at least one checklist factor.');
       setAnalysisResult(null);
@@ -1703,7 +1795,39 @@ export default function AIAnalysisView() {
             )}
           </div>
 
-          {/* Large Action Button with Validation Error Banner */}
+          {/* Confirmed Incident Location Display in the Form (Requirement 5) */}
+          {selectedIncidentLocation && (
+            <div className="p-3.5 rounded-2xl bg-orange-50/90 border-2 border-orange-300 shadow-2xs space-y-1 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-black uppercase tracking-wider text-orange-900 font-mono flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#FF5A36]" />
+                  <span>INCIDENT LOCATION</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenMapClick}
+                  className="text-[11px] font-bold text-orange-700 hover:text-orange-950 underline cursor-pointer"
+                >
+                  Change Location
+                </button>
+              </div>
+              <div className="text-sm font-black text-slate-900">
+                {selectedIncidentLocation.name || 'Industrial Facility Point'}
+              </div>
+              <div className="text-xs font-mono font-semibold text-slate-600 flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-white border border-orange-200 text-slate-800">
+                  📍 {selectedIncidentLocation.latitude.toFixed(4)}, {selectedIncidentLocation.longitude.toFixed(4)}
+                </span>
+                {selectedIncidentLocation.address && selectedIncidentLocation.address !== selectedIncidentLocation.name && (
+                  <span className="truncate max-w-xs text-slate-500 font-sans text-[11px]">
+                    {selectedIncidentLocation.address}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons: [ 📍 Open Map ]       [ RUN AI SAFETY ANALYSIS → ] */}
           <div className="pt-2 space-y-3">
             {validationError && (
               <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-xs sm:text-sm font-semibold flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
@@ -1717,25 +1841,41 @@ export default function AIAnalysisView() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleRunAnalysis}
-              disabled={isAnalyzing}
-              className="w-full py-4 sm:py-5 px-6 rounded-xl font-black text-base sm:text-lg tracking-wider uppercase shadow-lg transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-[#FF6B4A] via-[#FF5A36] to-[#FFA133] hover:opacity-95 text-white shadow-orange-500/30 hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-60"
-            >
-              {isAnalyzing ? (
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span className="normal-case text-base sm:text-lg">{analysisStep || 'Running AI Safety Analysis...'}</span>
-                </div>
-              ) : (
-                <>
-                  <Cpu className="w-6 h-6 text-white" />
-                  <span>RUN AI SAFETY ANALYSIS</span>
-                  <ArrowRight className="w-6 h-6 ml-1" />
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <button
+                type="button"
+                onClick={handleOpenMapClick}
+                disabled={isRequestingLocation || isAnalyzing}
+                className={`sm:col-span-4 py-4 sm:py-5 px-4 rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase shadow-md transition-all flex items-center justify-center gap-2 border-2 cursor-pointer disabled:opacity-60 ${
+                  selectedIncidentLocation
+                    ? 'bg-orange-50 hover:bg-orange-100 text-orange-900 border-orange-300'
+                    : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 hover:border-[#FF5A36] hover:text-[#FF5A36]'
+                }`}
+              >
+                <MapPin className="w-5 h-5 text-[#FF5A36] shrink-0" />
+                <span>{isRequestingLocation ? 'Locating...' : selectedIncidentLocation ? 'Edit Map' : 'Open Map'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRunAnalysis}
+                disabled={isAnalyzing}
+                className="sm:col-span-8 py-4 sm:py-5 px-6 rounded-xl font-black text-sm sm:text-base tracking-wider uppercase shadow-lg transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-[#FF6B4A] via-[#FF5A36] to-[#FFA133] hover:opacity-95 text-white shadow-orange-500/30 hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-60"
+              >
+                {isAnalyzing ? (
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="normal-case text-base sm:text-lg">{analysisStep || 'Running AI Safety Analysis...'}</span>
+                  </div>
+                ) : (
+                  <>
+                    <Cpu className="w-6 h-6 text-white" />
+                    <span>RUN AI SAFETY ANALYSIS</span>
+                    <ArrowRight className="w-6 h-6 ml-1" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1807,6 +1947,9 @@ export default function AIAnalysisView() {
                         setDescription(sample.text);
                         setReportType(sample.type);
                         setLocation(sample.location);
+                        if (sample.incidentLocation) {
+                          setSelectedIncidentLocation(sample.incidentLocation);
+                        }
                         setUploadedIndex(prev => prev + 1);
                         setValidationError('');
                         setAnalysisResult(null);
@@ -1926,6 +2069,25 @@ export default function AIAnalysisView() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Incident Location Map with Risk-Colored Marker & Admin Navigation (Requirement 7 & 8) */}
+                  <IncidentPostAnalysisMap
+                    incidentLocation={analysisResult.incidentLocation || selectedIncidentLocation || {
+                      latitude: analysisResult.incident_latitude || 12.9716,
+                      longitude: analysisResult.incident_longitude || 77.5946,
+                      name: analysisResult.incident_location_name || analysisResult.location || 'Crude Distillation Unit',
+                      address: analysisResult.incident_address || `${analysisResult.incident_location_name || 'Industrial Facility'} Area`
+                    }}
+                    riskScore={analysisResult.risk_score}
+                    riskLevel={
+                      analysisResult.risk_score > 66 ? 'High Risk' :
+                      analysisResult.risk_score >= 33 ? 'Medium Risk' : 'Low Risk'
+                    }
+                    incidentType={analysisResult.classification || reportType}
+                    reportName={analysisResult.report_name}
+                    onNavigate={() => setShowAdminNavModal(true)}
+                    isAdmin={true}
+                  />
 
                   {/* Section 2: Detected Hazards & Energy Vectors */}
                   <div className="rounded-2xl border-2 border-stone-200 p-4 shadow-xs bg-white">
@@ -2176,6 +2338,41 @@ export default function AIAnalysisView() {
           onClose={() => setSelectedDossierReport(null)}
         />
       )}
+
+      {/* Incident Location Selection Modal (Requirement 3) */}
+      <IncidentLocationModal
+        isOpen={showMapModal}
+        onClose={() => setShowMapModal(false)}
+        initialLocation={selectedIncidentLocation}
+        userLocation={userLocation}
+        onConfirm={(loc) => {
+          setSelectedIncidentLocation(loc);
+          if (loc.name) {
+            setLocation(loc.name);
+          }
+          if (validationError) {
+            setValidationError('');
+          }
+        }}
+      />
+
+      {/* Admin Incident Navigation Modal (Requirement 8 & 9) */}
+      <AdminNavigationModal
+        isOpen={showAdminNavModal}
+        onClose={() => setShowAdminNavModal(false)}
+        incidentLocation={analysisResult?.incidentLocation || selectedIncidentLocation || {
+          latitude: analysisResult?.incident_latitude || 12.9716,
+          longitude: analysisResult?.incident_longitude || 77.5946,
+          name: analysisResult?.incident_location_name || analysisResult?.location || 'Crude Distillation Unit',
+          address: analysisResult?.incident_address || 'Refinery Operating Sector'
+        }}
+        riskScore={analysisResult?.risk_score || 50}
+        riskLevel={
+          (analysisResult?.risk_score || 50) > 66 ? 'High Risk' :
+          (analysisResult?.risk_score || 50) >= 33 ? 'Medium Risk' : 'Low Risk'
+        }
+        incidentType={analysisResult?.classification || reportType}
+      />
 
     </div>
   );

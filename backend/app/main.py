@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .database import engine, Base
+from .database import engine, Base, ensure_database_schema
 from .config import settings
 from .routers import auth, reports, analysis, sif_intelligence, feedback, dashboard, weak_signals, sif_precursors
 from .seed_data import seed_sample_data
 
-# Create DB Tables
+# Create DB Tables & Ensure Schema
 Base.metadata.create_all(bind=engine)
+ensure_database_schema()
 
 # Create FastAPI app
 app = FastAPI(

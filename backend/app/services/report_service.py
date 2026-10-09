@@ -45,6 +45,10 @@ def create_report(db: Session, report_data: SafetyReportCreate, user: User) -> S
         location=report_data.location.strip(),
         report_date=report_data.report_date.strip() if report_data.report_date and report_data.report_date.strip() else datetime.utcnow().strftime("%Y-%m-%d"),
         additional_context=report_data.additional_context.strip() if report_data.additional_context else None,
+        incident_latitude=report_data.incident_latitude,
+        incident_longitude=report_data.incident_longitude,
+        incident_address=report_data.incident_address.strip() if report_data.incident_address else None,
+        incident_location_name=report_data.incident_location_name.strip() if report_data.incident_location_name else None,
         analysis_status=AnalysisStatusEnum.PENDING.value
     )
     db.add(db_report)

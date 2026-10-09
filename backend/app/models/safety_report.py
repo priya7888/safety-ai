@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum, Float
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -30,6 +30,11 @@ class SafetyReport(Base):
     location = Column(String(200), nullable=False)
     report_date = Column(String(50), nullable=False)
     additional_context = Column(Text, nullable=True)
+
+    incident_latitude = Column(Float, nullable=True)
+    incident_longitude = Column(Float, nullable=True)
+    incident_address = Column(String(500), nullable=True)
+    incident_location_name = Column(String(200), nullable=True)
     
     analysis_status = Column(String(50), default="PENDING", nullable=False) # PENDING, PROCESSING, COMPLETED, FAILED
     created_at = Column(DateTime, default=datetime.utcnow)

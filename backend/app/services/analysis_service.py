@@ -381,7 +381,11 @@ def execute_direct_analysis(
         description=description_for_report,
         location=location,
         report_date=report_date,
-        additional_context=extra_context
+        additional_context=extra_context,
+        incident_latitude=request.incident_latitude,
+        incident_longitude=request.incident_longitude,
+        incident_address=request.incident_address,
+        incident_location_name=request.incident_location_name
     )
 
 
@@ -391,6 +395,12 @@ def execute_direct_analysis(
         report = duplicate
         is_duplicate = True
         message = f"Observation matches existing report {report.report_reference}. Reusing existing analysis."
+        if request.incident_latitude is not None and report.incident_latitude is None:
+            report.incident_latitude = request.incident_latitude
+            report.incident_longitude = request.incident_longitude
+            report.incident_address = request.incident_address
+            report.incident_location_name = request.incident_location_name
+            db.commit()
         # Ensure analysis exists for duplicate
         analysis = db.query(AIAnalysis).filter(AIAnalysis.report_id == report.id).first()
         if not analysis:
@@ -502,6 +512,10 @@ def execute_direct_analysis(
         weak_signal_reason=ws_res.get("weak_signal_reason"),
         related_reports=ws_res.get("related_reports", []),
         escalation_path=ws_res.get("escalation_path"),
+        incident_latitude=report.incident_latitude if report.incident_latitude is not None else request.incident_latitude,
+        incident_longitude=report.incident_longitude if report.incident_longitude is not None else request.incident_longitude,
+        incident_address=report.incident_address or request.incident_address,
+        incident_location_name=report.incident_location_name or request.incident_location_name,
         ai_classification=raw_result.get("ai_classification", "Non-SIF-potential"),
         ai_sif_score=raw_result.get("ai_sif_score", risk_score),
         ai_confidence=raw_result.get("ai_confidence", confidence),
