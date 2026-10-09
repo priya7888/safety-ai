@@ -286,6 +286,15 @@ export const api = {
     return res.json();
   },
 
+  getMapIncidents: async () => {
+    const res = await fetch(`${API_BASE}/reports/map-incidents`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch map incidents');
+    return res.json();
+  },
+
+
   getReportById: async (reportId) => {
     const res = await fetch(`${API_BASE}/reports/${reportId}`, {
       headers: getAuthHeaders()

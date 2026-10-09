@@ -49,6 +49,7 @@ def create_report(db: Session, report_data: SafetyReportCreate, user: User) -> S
         incident_longitude=report_data.incident_longitude,
         incident_address=report_data.incident_address.strip() if report_data.incident_address else None,
         incident_location_name=report_data.incident_location_name.strip() if report_data.incident_location_name else None,
+        assigned_admin_id=getattr(user, "assigned_admin_id", None),
         analysis_status=AnalysisStatusEnum.PENDING.value
     )
     db.add(db_report)
@@ -61,10 +62,24 @@ def get_organization_reports(
     org_id: str,
     search: Optional[str] = None,
     report_type: Optional[str] = None,
-    analysis_status: Optional[str] = None
+    analysis_status: Optional[str] = None,
+    user: Optional[User] = None
 ) -> List[SafetyReportListItem]:
-    """Retrieves all reports strictly isolated to the authenticated organization."""
+    """Retrieves reports strictly scoped by role: Normal Users only see their own; Admins see their allocated workers' reports."""
     query = db.query(SafetyReport).filter(SafetyReport.organization_id == org_id)
+
+    # Scoped segregation:
+    if user:
+        is_admin = user.role in ["ADMINISTRATOR", "CHIEF_HSE_AUDITOR", "ADMIN"] or "admin" in user.email.lower()
+        if not is_admin:
+            # Field Worker: strictly sees only their own reports
+            query = query.filter(SafetyReport.user_id == user.id)
+        else:
+            # Respective Admin: sees reports submitted by their allocated workers or themselves
+            query = query.filter(
+                (SafetyReport.assigned_admin_id == user.id) | 
+                (SafetyReport.user_id == user.id)
+            )
 
     if report_type and report_type.upper() != "ALL":
         query = query.filter(SafetyReport.report_type == report_type.upper())
@@ -106,6 +121,11 @@ def get_organization_reports(
             id=r.id,
             report_reference=r.report_reference,
             organization_id=r.organization_id,
+            user_id=r.user_id,
+            reporter_name=r.user.full_name if r.user else None,
+            reporter_email=r.user.email if r.user else None,
+            assigned_admin_id=r.assigned_admin_id,
+            assigned_admin_name=r.assigned_admin.full_name if r.assigned_admin else None,
             report_type=r.report_type,
             description=r.description,
             original_description=r.original_description or r.description,
@@ -113,6 +133,10 @@ def get_organization_reports(
             location=r.location,
             report_date=r.report_date,
             additional_context=r.additional_context,
+            incident_latitude=r.incident_latitude,
+            incident_longitude=r.incident_longitude,
+            incident_address=r.incident_address,
+            incident_location_name=r.incident_location_name,
             analysis_status=r.analysis_status,
             sif_precursor_assessment=sif_assessment,
             identified_hazard=identified_hazard,

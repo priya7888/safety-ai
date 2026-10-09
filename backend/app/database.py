@@ -22,9 +22,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def ensure_database_schema():
-    """Ensures incident location columns exist in SQLite database if safety_reports was already created."""
+    """Ensures incident location and supervisor columns exist in SQLite database."""
     with engine.connect() as conn:
         try:
+            # Check safety_reports table
             result = conn.execute(text("PRAGMA table_info(safety_reports)"))
             existing_cols = {row[1] for row in result.fetchall()}
             if existing_cols:
@@ -32,11 +33,25 @@ def ensure_database_schema():
                     ("incident_latitude", "FLOAT"),
                     ("incident_longitude", "FLOAT"),
                     ("incident_address", "VARCHAR(500)"),
-                    ("incident_location_name", "VARCHAR(200)")
+                    ("incident_location_name", "VARCHAR(200)"),
+                    ("assigned_admin_id", "INTEGER")
                 ]
                 for col_name, col_type in new_cols:
                     if col_name not in existing_cols:
                         conn.execute(text(f"ALTER TABLE safety_reports ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+
+            # Check users table
+            user_result = conn.execute(text("PRAGMA table_info(users)"))
+            existing_user_cols = {row[1] for row in user_result.fetchall()}
+            if existing_user_cols:
+                new_user_cols = [
+                    ("assigned_admin_id", "INTEGER"),
+                    ("zone", "VARCHAR(100)")
+                ]
+                for col_name, col_type in new_user_cols:
+                    if col_name not in existing_user_cols:
+                        conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
                 conn.commit()
         except Exception as e:
             print("Database schema update notice:", e)

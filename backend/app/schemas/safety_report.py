@@ -18,6 +18,11 @@ class SafetyReportListItem(BaseModel):
     id: int
     report_reference: str
     organization_id: str
+    user_id: Optional[int] = None
+    reporter_name: Optional[str] = None
+    reporter_email: Optional[str] = None
+    assigned_admin_id: Optional[int] = None
+    assigned_admin_name: Optional[str] = None
     report_type: str
     description: str
     original_description: Optional[str] = None
@@ -44,6 +49,10 @@ class SafetyReportDetail(BaseModel):
     report_reference: str
     organization_id: str
     user_id: Optional[int] = None
+    reporter_name: Optional[str] = None
+    reporter_email: Optional[str] = None
+    assigned_admin_id: Optional[int] = None
+    assigned_admin_name: Optional[str] = None
     report_type: str
     description: str
     original_description: Optional[str] = None
@@ -59,6 +68,7 @@ class SafetyReportDetail(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     ai_analysis: Optional[AIAnalysisResponse] = None
+
 
     class Config:
         from_attributes = True

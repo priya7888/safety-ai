@@ -20,6 +20,20 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+const FOUR_ADMINS = [
+  { id: 'admin1', name: 'Admin Rajesh', title: 'Rig Ops Lead', zone: 'Rig Operations', email: 'admin1@gmail.com', pass: 'Admin1@123', team: 'Workers 1–10', orgId: 'id001' },
+  { id: 'admin2', name: 'Admin Priya', title: 'Refinery Plant Lead', zone: 'Refinery Processing', email: 'admin2@gmail.com', pass: 'Admin2@123', team: 'Workers 11–20', orgId: 'id002' },
+  { id: 'admin3', name: 'Admin Vikram', title: 'Pipeline Lead', zone: 'Pipeline Transmission', email: 'admin3@gmail.com', pass: 'Admin3@123', team: 'Workers 21–30', orgId: 'id003' },
+  { id: 'admin4', name: 'Admin Sunita', title: 'Hazmat Lead', zone: 'Hazmat Storage', email: 'admin4@gmail.com', pass: 'Admin4@123', team: 'Workers 31–40', orgId: 'id004' },
+];
+
+const TEAM_WORKERS = [
+  { id: 'worker1', name: 'Worker 01', zone: 'Rig Operations', supervisor: 'Admin Rajesh', email: 'worker1@gmail.com', pass: 'Worker@123', orgId: 'id001' },
+  { id: 'worker11', name: 'Worker 11', zone: 'Refinery Processing', supervisor: 'Admin Priya', email: 'worker11@gmail.com', pass: 'Worker@123', orgId: 'id002' },
+  { id: 'worker21', name: 'Worker 21', zone: 'Pipeline Transmission', supervisor: 'Admin Vikram', email: 'worker21@gmail.com', pass: 'Worker@123', orgId: 'id003' },
+  { id: 'worker31', name: 'Worker 31', zone: 'Hazmat Storage', supervisor: 'Admin Sunita', email: 'worker31@gmail.com', pass: 'Worker@123', orgId: 'id004' },
+];
+
 // Preset credentials for both Administrator and Normal User
 const PRESET_ACCOUNTS = {
   admin: {
@@ -39,8 +53,8 @@ const PRESET_ACCOUNTS = {
     roleLabel: 'Normal User',
     title: 'Field Safety Operator',
     badge: 'Standard Operations',
-    email: 'user1@gmail.com',
-    password: 'User1@123',
+    email: 'worker1@gmail.com',
+    password: 'Worker@123',
     orgId: 'id001',
     orgName: 'Oil India Limited – Field Operations',
     accessSummary: 'Plant safety monitoring, incident submission, precursor telemetry, and signal review.',
@@ -345,6 +359,74 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               <Info className="w-4 h-4 shrink-0" />
               <span>{PRESET_ACCOUNTS[activeRole].accessSummary}</span>
             </div>
+
+            {/* 4 Admins Picker (With 10 Allocated Workers each) */}
+            {activeRole === 'admin' && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Select from 4 Designated Admins (10 Allocated Workers Each):
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {FOUR_ADMINS.map(adm => (
+                    <button
+                      key={adm.id}
+                      type="button"
+                      onClick={() => {
+                        setEmail(adm.email);
+                        setPassword(adm.pass);
+                        setOrgId(adm.orgId);
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer text-xs ${
+                        email.toLowerCase() === adm.email.toLowerCase()
+                          ? 'bg-amber-500/15 border-amber-500 font-bold text-amber-950 dark:text-amber-200'
+                          : 'bg-slate-50 dark:bg-[#141418] border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-bold flex items-center justify-between">
+                        <span>{adm.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-mono font-semibold">10 Workers</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">{adm.zone}</div>
+                      <div className="text-[9px] font-mono text-amber-600 dark:text-amber-400 mt-0.5">{adm.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Workers Picker (Mapped to Respective Admins) */}
+            {activeRole === 'normal' && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Select Field Worker (Segregated to Respective Admin):
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {TEAM_WORKERS.map(w => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      onClick={() => {
+                        setEmail(w.email);
+                        setPassword(w.pass);
+                        setOrgId(w.orgId);
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer text-xs ${
+                        email.toLowerCase() === w.email.toLowerCase()
+                          ? 'bg-sky-500/15 border-sky-500 font-bold text-sky-950 dark:text-sky-200'
+                          : 'bg-slate-50 dark:bg-[#141418] border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-bold flex items-center justify-between">
+                        <span>{w.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-semibold">Worker</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">Reports to: {w.supervisor}</div>
+                      <div className="text-[9px] font-mono text-sky-600 dark:text-sky-400 mt-0.5">{w.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Custom Admin-Provisioned Accounts if any exist */}
             {customAccounts.length > 0 && (

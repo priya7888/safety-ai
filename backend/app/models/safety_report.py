@@ -35,13 +35,15 @@ class SafetyReport(Base):
     incident_longitude = Column(Float, nullable=True)
     incident_address = Column(String(500), nullable=True)
     incident_location_name = Column(String(200), nullable=True)
+    assigned_admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     analysis_status = Column(String(50), default="PENDING", nullable=False) # PENDING, PROCESSING, COMPLETED, FAILED
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="safety_reports")
-    user = relationship("User", back_populates="safety_reports")
+    user = relationship("User", foreign_keys=[user_id], back_populates="safety_reports")
+    assigned_admin = relationship("User", foreign_keys=[assigned_admin_id])
     ai_analysis = relationship("AIAnalysis", back_populates="safety_report", uselist=False, cascade="all, delete-orphan")
     feedbacks = relationship("Feedback", back_populates="safety_report", cascade="all, delete-orphan")
     weak_signals = relationship("WeakSignal", secondary="report_weak_signals", back_populates="safety_reports")

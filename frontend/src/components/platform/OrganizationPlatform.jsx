@@ -56,6 +56,7 @@ import AnalyticsView from './AnalyticsView';
 import RiskHeatmapView from './RiskHeatmapView';
 import LifeSavingRulesView from './LifeSavingRulesView';
 import SettingsView from './SettingsView';
+import IncidentRadarMapView from './IncidentRadarMapView';
 
 export default function OrganizationPlatform({ 
   currentPath = '/dashboard', 
@@ -96,6 +97,10 @@ export default function OrganizationPlatform({
 
       case '/ai-analysis':
         return <AIAnalysisView onNavigate={onNavigate} />;
+
+      case '/incident-map':
+      case '/map':
+        return <IncidentRadarMapView onNavigate={onNavigate} />;
 
       case '/bulk-upload':
         return <BulkUploadView onNavigate={onNavigate} />;

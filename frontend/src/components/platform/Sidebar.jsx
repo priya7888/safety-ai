@@ -6,14 +6,15 @@ import {
   FileText, 
   Activity, 
   ShieldAlert, 
-  ShieldCheck,
+  ShieldCheck, 
   Zap, 
   Settings, 
   LogOut, 
   X,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Compass
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -41,6 +42,7 @@ export default function Sidebar({
       items: [
         { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'ai_analysis', path: '/ai-analysis', label: 'AI Analysis', icon: Cpu, isAi: true },
+        { id: 'incident_map', path: '/incident-map', label: isAdmin ? 'Incident Radar & Map' : 'My Map & Incidents', icon: Compass },
         { id: 'bulk_upload', path: '/bulk-upload', label: 'Bulk Upload', icon: UploadCloud },
         { id: 'reports', path: '/reports', label: 'All Reports', icon: FileText },
         { id: 'week_signals', path: '/week-signals', label: 'Week Signals', icon: Activity },

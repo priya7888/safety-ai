@@ -75,14 +75,33 @@ def list_reports(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lists safety reports strictly isolated to the authenticated organization."""
+    """Lists safety reports strictly isolated to the authenticated organization and filtered by user role."""
     return get_organization_reports(
         db=db,
         org_id=current_user.organization_id,
         search=search,
         report_type=report_type,
-        analysis_status=analysis_status
+        analysis_status=analysis_status,
+        user=current_user
     )
+
+@router.get("/map-incidents", response_model=List[SafetyReportListItem])
+def list_map_incidents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns incident reports with geo-coordinates.
+    - If Worker: only returns their own submitted incident locations.
+    - If Admin: returns incident locations submitted by their 10 allocated workers.
+    """
+    all_reports = get_organization_reports(
+        db=db,
+        org_id=current_user.organization_id,
+        user=current_user
+    )
+    # Filter to reports with valid coordinates
+    return [r for r in all_reports if r.incident_latitude is not None and r.incident_longitude is not None]
 
 @router.get("/{report_id}", response_model=SafetyReportDetail)
 def get_report_details(

@@ -23,6 +23,9 @@ class UserResponse(BaseModel):
     organization_name: Optional[str] = None
     is_admin: bool = False
     role_name: str = "Normal User"
+    zone: Optional[str] = None
+    assigned_admin_id: Optional[int] = None
+    assigned_admin_name: Optional[str] = None
     permissions: List[str] = []
 
 class TokenResponse(BaseModel):
