@@ -13,7 +13,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -51,6 +52,7 @@ export default function Sidebar({
       title: 'SYSTEM',
       items: [
         { id: 'settings', path: '/settings', label: 'Settings', icon: Settings },
+        { id: 'field_app', path: '/field-app', label: 'Worker Field App (SOS)', icon: Smartphone },
       ]
     }
   ];

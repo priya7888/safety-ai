@@ -11,6 +11,7 @@ import Footer from './components/Footer';
 import LoginModal from './components/LoginModal';
 import InteractiveAiDemoModal from './components/InteractiveAiDemoModal';
 import OrganizationPlatform from './components/platform/OrganizationPlatform';
+import WorkerFieldApp from './components/field/WorkerFieldApp';
 
 const PROTECTED_ROUTES = [
   '/dashboard',
@@ -170,6 +171,16 @@ function AppContent() {
       });
     }
   };
+
+  // Dedicated Field Worker Mobile App Route (Accessible for ground personnel & SOS)
+  if (currentPath === '/field-app' || currentPath === '/worker-app' || currentPath === '/app') {
+    return (
+      <WorkerFieldApp 
+        onNavigate={navigateTo}
+        onExitToWeb={() => navigateTo(isAuthenticated ? '/dashboard' : '/')}
+      />
+    );
+  }
 
   // Protect all 13 platform routes: require authentication
   if (PROTECTED_ROUTES.includes(currentPath)) {

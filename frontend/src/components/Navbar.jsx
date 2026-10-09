@@ -3,10 +3,11 @@ import {
   Shield, 
   Menu, 
   X, 
-  LayoutGrid
+  LayoutGrid,
+  Smartphone
 } from 'lucide-react';
 
-export default function Navbar({ onOpenLogin, onOpenDemo }) {
+export default function Navbar({ onOpenLogin, onOpenDemo, onOpenFieldApp }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -93,8 +94,18 @@ export default function Navbar({ onOpenLogin, onOpenDemo }) {
             ))}
           </nav>
 
-          {/* Right Side: Organization Login Button (Always Original) */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right Side: Worker Field App & Organization Login */}
+          <div className="hidden md:flex items-center gap-2.5">
+            <button
+              onClick={onOpenFieldApp || (() => { window.history.pushState({}, '', '/field-app'); window.dispatchEvent(new PopStateEvent('popstate')); })}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30 text-xs font-bold shadow-md hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+              title="Launch dedicated Field Worker Mobile App with SOS & Rapid Checklist"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+              <span>Worker Field App</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            </button>
+
             <button
               onClick={onOpenLogin}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-slate-950 text-sm font-bold shadow-lg shadow-amber-500/25 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
@@ -131,7 +142,22 @@ export default function Navbar({ onOpenLogin, onOpenDemo }) {
             </button>
           ))}
           
-          <div className="pt-3 border-t border-slate-800">
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onOpenFieldApp) onOpenFieldApp();
+                else {
+                  window.history.pushState({}, '', '/field-app');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 text-amber-300 border border-amber-500/30 font-bold text-sm shadow-md cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4 text-amber-400" />
+              <span>📱 Open Worker Field App (SOS &amp; Log)</span>
+            </button>
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

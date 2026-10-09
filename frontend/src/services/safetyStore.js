@@ -1047,3 +1047,49 @@ export function addReportRecord(reportData) {
   notifySubscribers();
   return { report: reportItem, totalCount: updatedReports.length };
 }
+
+export function getStoredTotalRecords() {
+  try {
+    const isWiped = typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_WIPED_KEY) === 'true';
+    if (isWiped) {
+      return [];
+    }
+    const storeState = getStoreState();
+    if (storeState?.reports && storeState.reports.length > 0) {
+      return storeState.reports;
+    }
+    const raw = localStorage.getItem('SAFETY_TOTAL_REPORTS_V3');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+export function autoPersistToTotalRecords(newRecord) {
+  try {
+    const current = getStoredTotalRecords();
+    const existingIndex = current.findIndex(
+      r => (r.description && newRecord.description && r.description.trim() === newRecord.description.trim()) ||
+           (r.report_reference && r.report_reference === newRecord.report_reference)
+    );
+    let updated;
+    let savedRecord = newRecord;
+    if (existingIndex >= 0) {
+      savedRecord = { ...current[existingIndex], ...newRecord };
+      updated = [...current];
+      updated[existingIndex] = savedRecord;
+    } else {
+      updated = [newRecord, ...current];
+    }
+    localStorage.setItem('SAFETY_TOTAL_REPORTS_V3', JSON.stringify(updated));
+    window.dispatchEvent(new Event('storage'));
+    return { record: savedRecord, totalCount: updated.length };
+  } catch (err) {
+    console.error('Error auto-saving report to total records:', err);
+    return { record: newRecord, totalCount: 7 };
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Smartphone } from 'lucide-react';
 
 export default function HeroSection({ onExplore, onLogin }) {
 
@@ -198,7 +198,7 @@ export default function HeroSection({ onExplore, onLogin }) {
           {/* Explore It Button */}
           {/* NOW SCROLLS TO ABOUT SECTION */}
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-center gap-4">
 
             <button
               onClick={() => scrollToSection('about')}
@@ -229,15 +229,45 @@ export default function HeroSection({ onExplore, onLogin }) {
                 tracking-wide
               "
             >
-
               <span>
                 Explore It
               </span>
-
               <ArrowRight
                 className="w-5 h-5 stroke-[2.5]"
               />
+            </button>
 
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/field-app');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="
+                inline-flex
+                items-center
+                gap-2.5
+                px-6
+                py-4
+                rounded-xl
+                bg-[#0d1527]/90
+                hover:bg-[#152038]
+                border-2
+                border-amber-500/40
+                hover:border-amber-400
+                text-amber-300
+                font-extrabold
+                text-sm
+                shadow-xl
+                shadow-amber-500/10
+                hover:scale-105
+                active:scale-95
+                transition-all
+                duration-200
+                cursor-pointer
+              "
+            >
+              <Smartphone className="w-5 h-5 text-amber-400" />
+              <span>Worker Field App (SOS &amp; Log)</span>
             </button>
 
           </div>
