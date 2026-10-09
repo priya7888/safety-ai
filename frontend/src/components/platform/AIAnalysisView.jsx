@@ -381,155 +381,114 @@ function calculateDynamicRiskScore(hazard, energy, exposure, barrierStatus, sifS
   const checkListLower = Array.isArray(checklist) ? checklist.map(c => c.toLowerCase()) : [];
   const combText = `${tLow} ${hLow} ${checkListLower.join(' ')}`;
 
-  // 1. Multi-Hazard Severity & Cumulative Factor Boost (0–35)
-  const detectedWeights = [];
-
-  // LOTO
-  if (/loto|lockout|tagout|isolation|not locked out|ignored loto/.test(combText)) {
-    detectedWeights.push(30);
-  }
-  // Confined Space
-  if (/confined space|tank entry|vessel entry|atmospheric monitoring|gas test/.test(combText)) {
-    detectedWeights.push(30);
-  }
-  // High Pressure
-  if (/high[- ]pressure|pressurized|hydraulic|pneumatic|pipe burst|blowout|psi|bar/.test(combText)) {
-    detectedWeights.push(28);
-  }
-  // Line of Fire
-  if (/line[- ]of[- ]fire|line of fire|under load|suspended load|dropped object|struck-by/.test(combText)) {
-    detectedWeights.push(28);
-  }
-  // Electrical
-  if (/electrical|arc flash|voltage|switchgear|11kv|415v/.test(combText)) {
-    detectedWeights.push(28);
-  }
-  // Fall from height
-  if (/fall from height|work at height|scaffold|ladder|roof edge/.test(combText)) {
-    detectedWeights.push(26);
-  }
-  // Fire / explosion
-  const fireText = combText.replace(/line[- ]of[- ]fire/g, '');
-  if (/fire|explosion|hot work|welding|flash/.test(fireText)) {
-    detectedWeights.push(26);
-  }
-  // PPE
-  if (/ppe|safety glasses|helmet|goggles|respirator/.test(combText)) {
-    const hasCritical = /loto|lockout|pressure|high-pressure|confined space|electrical|suspended load/.test(combText);
-    detectedWeights.push(hasCritical ? 22 : 14);
-  }
-  // Slip/trip/housekeeping
-  if (/slip|trip|housekeeping/.test(combText)) {
-    detectedWeights.push(8);
+  // 1. Energy utility (0.0 - 1.0)
+  let eU = 0.35;
+  if (/high[- ]pressure|pressurized|hydraulic|pneumatic|blowout|psi|bar/.test(combText) || /pressure|pneumatic|hydraulic/.test(eLow)) {
+    eU = 0.95;
+  } else if (/electrical|arc flash|voltage|11kv|415v|switchgear/.test(combText) || /electrical/.test(eLow)) {
+    eU = 0.95;
+  } else if (/toxic|atmospheric|confined space|h2s|asphyxiat/.test(combText) || /toxic|atmospheric/.test(eLow)) {
+    eU = 0.92;
+  } else if (/suspended load|dropped object|fall from height|work at height|crane/.test(combText) || /gravity/.test(eLow)) {
+    eU = 0.90;
+  } else if (/thermal|fire|flame|explosion|flash fire/.test(combText) || /thermal/.test(eLow)) {
+    eU = 0.88;
+  } else if (/kinetic|mobile equipment|forklift|vehicle|machinery/.test(combText) || /kinetic/.test(eLow)) {
+    eU = 0.70;
+  } else if (/chemical|acid|corrosive/.test(combText) || eLow.includes('chemical')) {
+    eU = 0.65;
+  } else if (/slip|trip|housekeeping|puddle/.test(combText)) {
+    eU = 0.10;
   }
 
-  if (detectedWeights.length === 0) {
-    detectedWeights.push(10);
-  }
-
-  detectedWeights.sort((a, b) => b - a);
-  let hazardScore = detectedWeights[0];
-  for (let i = 1; i < detectedWeights.length; i++) {
-    const w = detectedWeights[i];
-    if (w >= 26) hazardScore += 6;
-    else if (w >= 20) hazardScore += 4;
-    else hazardScore += 2;
-  }
-  hazardScore = Math.min(35, hazardScore);
-
-  // 2. Energy exposure (0–28)
-  let energyScore = 6;
-  if (/high[- ]pressure|pressure|hydraulic|pneumatic|blowout|psi|bar/.test(combText) || /pressure|pneumatic|hydraulic/.test(eLow)) {
-    energyScore = 28;
-  } else if (/electrical|arc flash|voltage|11kv|415v/.test(combText) || /electrical/.test(eLow)) {
-    energyScore = 28;
-  } else if (/confined space|tank entry|toxic|atmospheric|h2s/.test(combText) || /toxic|atmospheric/.test(eLow)) {
-    energyScore = 26;
-  } else if (/gravity|suspended load|dropped object|fall from height|work at height/.test(combText) || /gravity/.test(eLow)) {
-    energyScore = 25;
-  } else if (/thermal|fire|flame/.test(combText) || /thermal/.test(eLow)) {
-    energyScore = 24;
-  } else if (/kinetic|mobile equipment|forklift|vehicle/.test(combText) || /kinetic/.test(eLow)) {
-    energyScore = 20;
-  } else if (eLow.includes('multiple')) {
-    energyScore = 26;
-  } else if (eLow.includes('chemical')) {
-    energyScore = 18;
-  }
-
-  // 3. Worker exposure (0–22)
-  let exposureScore = 6;
-  if (/line-of-fire|line of fire|stood in the line of fire|under load|under suspended load|beneath suspended/.test(combText) || /line-of-fire/.test(exLow)) {
-    exposureScore = 22;
+  // 2. Exposure utility (0.0 - 1.0)
+  let exU = 0.40;
+  if (/not exposed|zero exposure|no personnel/.test(combText) || /not exposed/.test(exLow)) {
+    exU = 0.0;
+  } else if (/line[- ]of[- ]fire|under load|under suspended load|drop zone/.test(combText) || /line-of-fire/.test(exLow)) {
+    exU = 0.95;
   } else if (/confined space|inside vessel|tank entry/.test(combText) || /confined space/.test(exLow)) {
-    exposureScore = 20;
-  } else if (/touching live|live panel|direct physical proximity|fall edge/.test(combText) || /direct physical/.test(exLow)) {
-    exposureScore = 20;
-  } else if (/trajectory|restricted area|near moving/.test(combText)) {
-    exposureScore = 16;
-  } else if (/not exposed|zero exposure/.test(combText) || /not exposed/.test(exLow)) {
-    exposureScore = 2;
-  } else if (/slip|walking|door/.test(combText)) {
-    exposureScore = 5;
-  } else {
-    exposureScore = 8;
+    exU = 0.92;
+  } else if (/touching live|live panel|direct physical/.test(combText)) {
+    exU = 0.90;
+  } else if (/slip|trip|walking|door/.test(combText)) {
+    exU = 0.20;
   }
 
-  // 4. Barrier condition (0–20)
-  let barrierScore = 4;
-  if (/FAILED|RUPTURE/.test(bNorm)) {
-    barrierScore = 20;
-  } else if (/BYPASSED|OVERRIDDEN/.test(bNorm)) {
-    barrierScore = 20;
-  } else if (/MISSING|NOT DEPLOYED/.test(bNorm) || /loto not followed|ignored loto|without isolation|not locked out/.test(combText)) {
-    if (/loto|lockout|isolation|gas test|guard/.test(combText)) {
-      barrierScore = 18;
-    } else {
-      barrierScore = 10;
-    }
+  // 3. Barrier effectiveness (0.0 - 1.0)
+  let bEff = 0.45;
+  if (/FULLY EFFECTIVE|INTACT|FUNCTIONING|PRESENT/.test(bNorm)) {
+    bEff = 0.90;
+  } else if (/FAILED|RUPTURE|BYPASSED|OVERRIDDEN/.test(bNorm)) {
+    bEff = 0.00;
+  } else if (/MISSING|NOT DEPLOYED/.test(bNorm) || /loto not followed|not locked out/.test(combText)) {
+    bEff = 0.05;
   } else if (/COMPROMISED|DEGRADED/.test(bNorm)) {
-    barrierScore = 10;
-  } else if (/PRESENT|INTACT|FUNCTIONING/.test(bNorm)) {
-    barrierScore = 2;
-  } else {
-    barrierScore = 5;
+    bEff = 0.40;
+  }
+  const bFail = Math.max(0, 1.0 - bEff);
+
+  // 4. Hazard modifier (0.60 - 1.25)
+  let hMod = 1.0;
+  if (/loto|lockout|isolation|confined space/.test(combText)) {
+    hMod = 1.15;
+  } else if (/line[- ]of[- ]fire|high[- ]pressure|suspended load|electrical/.test(combText)) {
+    hMod = 1.12;
+  } else if (/fall|height|scaffold/.test(combText)) {
+    hMod = 1.10;
+  } else if (/slip|trip|housekeeping/.test(combText)) {
+    hMod = 0.70;
   }
 
-  // 5. Synergy escalation (0–15)
-  let synergyScore = 0;
-  const hasLoto = /loto|lockout|tagout|isolation/.test(combText);
-  const hasLof = /line of fire|line-of-fire|under load|suspended load/.test(combText);
-  const hasPress = /high[- ]pressure|pressure|hydraulic|pneumatic/.test(combText);
-  const hasConf = /confined space|tank entry|vessel entry/.test(combText);
+  // Gated likelihood
+  const sifLikelihood = eU * exU * bFail;
+  const modifiedLikelihood = Math.min(1.0, sifLikelihood * hMod);
 
-  if (hasLoto && hasLof && hasPress) {
-    synergyScore = 12;
-  } else if (hasConf && hasLoto) {
-    synergyScore = 12;
-  } else if (/suspended load/.test(combText) && hasLof) {
-    synergyScore = 10;
-  } else if (hasLoto && hasPress) {
-    synergyScore = 8;
-  } else if (hasPress && hasLof) {
-    synergyScore = 8;
+  // Piecewise linear interpolation
+  const anchors = [
+    [0.00, 5.0],
+    [0.04, 15.0],
+    [0.12, 25.0],
+    [0.25, 40.0],
+    [0.45, 60.0],
+    [0.65, 78.0],
+    [0.80, 88.0],
+    [1.00, 96.0]
+  ];
+  let continuousScore = 5.0;
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [x0, y0] = anchors[i];
+    const [x1, y1] = anchors[i + 1];
+    if (modifiedLikelihood <= x1) {
+      continuousScore = y0 + ((y1 - y0) / (x1 - x0)) * (modifiedLikelihood - x0);
+      break;
+    }
+    if (i === anchors.length - 2) {
+      continuousScore = y1;
+    }
   }
 
-  const rawScore = hazardScore + energyScore + exposureScore + barrierScore + synergyScore;
-
-  let scaledScore = 25;
-  if (rawScore >= 100) {
-    scaledScore = Math.min(95, 85 + Math.floor((rawScore - 100) * 0.6));
-  } else if (rawScore >= 80) {
-    scaledScore = Math.min(88, 75 + Math.floor((rawScore - 80) * 0.65));
-  } else if (rawScore >= 60) {
-    scaledScore = Math.min(74, 55 + Math.floor((rawScore - 60) * 0.95));
-  } else if (rawScore >= 40) {
-    scaledScore = Math.min(54, 38 + Math.floor((rawScore - 40) * 0.8));
-  } else {
-    scaledScore = Math.max(5, Math.floor(rawScore * 0.85));
+  if (exU <= 0.01 || bFail <= 0.01) {
+    continuousScore = Math.min(continuousScore, 10.0);
   }
 
-  return Math.max(0, Math.min(100, scaledScore));
+  // Safety-critical floor overrides
+  let overrideFloor = 0;
+  if (/loto|lockout|not locked out/.test(combText) && (eU >= 0.85 || /electrical|pressure/.test(combText)) && (exU >= 0.70 || /line of fire/.test(combText))) {
+    overrideFloor = 88;
+  } else if (/confined space|tank entry/.test(combText) && (/gas test|loto|bypassed/.test(combText) || bEff <= 0.40)) {
+    overrideFloor = 86;
+  } else if (/electrical|arc flash|11kv|415v/.test(combText) && (exU >= 0.70 || /touching|live/.test(combText)) && bEff <= 0.40) {
+    overrideFloor = 86;
+  } else if (/suspended load|crane lift/.test(combText) && /under load|drop zone|line of fire/.test(combText)) {
+    overrideFloor = 84;
+  } else if (/high[- ]pressure|hydraulic/.test(combText) && (exU >= 0.70 || /line of fire/.test(combText)) && bEff <= 0.40) {
+    overrideFloor = 82;
+  } else if (/work at height|fall from height/.test(combText) && /no harness|missing guardrail/.test(combText)) {
+    overrideFloor = 84;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(Math.max(continuousScore, overrideFloor))));
 }
 
 function getDynamicRecommendations(hazard, text) {
@@ -809,8 +768,128 @@ const CLASSIFICATION_CHECKLISTS = {
   ]
 };
 
+export const ALL_CHECKLIST_ITEMS = [
+  ...CLASSIFICATION_CHECKLISTS.NEAR_MISS.map(item => ({ ...item, category: 'NEAR_MISS', categoryLabel: 'Near Miss', badgeClass: 'bg-orange-100 text-[#FF5A36] border-orange-200' })),
+  ...CLASSIFICATION_CHECKLISTS.UNSAFE_ACT.map(item => ({ ...item, category: 'UNSAFE_ACT', categoryLabel: 'Unsafe Act', badgeClass: 'bg-purple-100 text-purple-700 border-purple-200' })),
+  ...CLASSIFICATION_CHECKLISTS.UNSAFE_CONDITION.map(item => ({ ...item, category: 'UNSAFE_CONDITION', categoryLabel: 'Unsafe Condition', badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' }))
+];
+
+export function detectCategoryFromExplanation(text) {
+  if (!text || !text.trim()) return null;
+  const tLow = text.toLowerCase().trim();
+
+  // 1. Near Miss Patterns (Unplanned close call, dropped item, energy release where injury narrowly avoided)
+  const nearMissRegexes = [
+    /\b(near\s*miss|almost\s*hit|nearly\s*struck|narrowly\s*missed|close\s*call|near\s*collision)\b/,
+    /\b(dropped\s*object|fell\s*from\s*height|fell\s*and\s*missed|falling\s*tool|dropped\s*from)\b/,
+    /\b(snapped|ruptured|burst|whipped|cable\s*broke|hose\s*whipped|wire\s*snapped)\b/,
+    /\b(slipped\s*and\s*regained|caught\s*balance|stumbled\s*but|almost\s*fell)\b/,
+    /\b(swerved|braked\s*suddenly|near\s*miss\s*with\s*vehicle)\b/,
+    /\b(arc\s*flash\s*occurred|spark\s*burst|blast\s*occurred|explosion\s*occurred|fire\s*flash)\b/
+  ];
+
+  // 2. Unsafe Act Patterns (Worker action, behavior, rule violation, PPE omission)
+  const unsafeActRegexes = [
+    /\b(not\s*wearing|without\s*(wearing|ppe|harness|helmet|glasses|gloves)|failed\s*to\s*wear|improper\s*ppe|removed\s*ppe)\b/,
+    /\b(procedure\s*not\s*followed|ptw\s*violation|permit\s*violation|without\s*permit|unauthorized\s*operation|no\s*ptw)\b/,
+    /\b(bypassed|bypassing|interlock\s*disabled|tampered\s*with|overrode|defeated\s*safety)\b/,
+    /\b(speeding|excessive\s*speed|driving\s*recklessly|cell\s*phone|phone\s*distraction|mobile\s*use)\b/,
+    /\b(standing\s*under|walked\s*under\s*suspended|under\s*the\s*crane|under\s*load|line\s*of\s*fire)\b/,
+    /\b(loto\s*not\s*followed|failed\s*to\s*isolate|did\s*not\s*de-energize|worked\s*on\s*live)\b/,
+    /\b(removed\s*(machine\s*)?guard|wrong\s*tool|improvised\s*tool|unauthorized\s*access)\b/,
+    /\b(smoking\s*in|horseplay|rushing|ignored\s*warning|ignored\s*alarm)\b/
+  ];
+
+  // 3. Unsafe Condition Patterns (Physical, mechanical, environmental workplace hazards)
+  const unsafeConditionRegexes = [
+    /\b(slippery\s*(surface|floor|ground|walkway)|oil\s*puddle|spill\s*on\s*floor|wet\s*floor|water\s*leak|puddle)\b/,
+    /\b(uneven\s*(ground|surface|grating|floor)|pothole|damaged\s*grating|hole\s*in\s*floor|trip\s*hazard)\b/,
+    /\b(damaged|broken|corroded|cracked|defective|leaking|faulty|malfunction)\s*(equipment|pump|pipe|valve|cable|wire|machine|flange|ladder|scaffold)\b/,
+    /\b(missing\s*(guard|handrail|cover|barrier|grating|barricade|sign|signage))\b/,
+    /\b(exposed\s*(wiring|wire|cable|conductor|voltage|busbar|live\s*part))\b/,
+    /\b(blocked\s*(exit|door|egress|aisle|fire\s*door|extinguisher))\b/,
+    /\b(poor\s*lighting|dark\s*(area|stairwell|hallway)|inadequate\s*illumination|dim\s*lighting)\b/,
+    /\b(gas\s*leak|chemical\s*spill|corrosion|rust|high\s*pressure\s*hazard|high\s*temp|overheating)\b/,
+    /\b(poor\s*housekeeping|clutter|debris\s*on\s*walkway|loose\s*tools)\b/
+  ];
+
+  const hasNM = nearMissRegexes.some(rx => rx.test(tLow));
+  const hasAct = unsafeActRegexes.some(rx => rx.test(tLow));
+  const hasCond = unsafeConditionRegexes.some(rx => rx.test(tLow));
+
+  if (hasNM && !hasAct) {
+    return {
+      category: 'NEAR_MISS',
+      label: 'NEAR MISS',
+      rationale: 'Unplanned close-call event / potential incident narrowly avoided'
+    };
+  }
+  if (hasAct) {
+    return {
+      category: 'UNSAFE_ACT',
+      label: 'UNSAFE ACT',
+      rationale: 'Worker behavior, procedural deviation, or PPE omission'
+    };
+  }
+  if (hasCond) {
+    return {
+      category: 'UNSAFE_CONDITION',
+      label: 'UNSAFE CONDITION',
+      rationale: 'Hazardous physical condition, environmental defect, or damaged equipment'
+    };
+  }
+
+  if (/\b(worker|operator|technician|employee|he|she|they)\b/.test(tLow) && /\b(did|was|not|walked|operated|rushed)\b/.test(tLow)) {
+    return {
+      category: 'UNSAFE_ACT',
+      label: 'UNSAFE ACT',
+      rationale: 'Worker action / operational activity context'
+    };
+  }
+
+  return {
+    category: 'UNSAFE_CONDITION',
+    label: 'UNSAFE CONDITION',
+    rationale: 'Physical workplace condition / environmental observation'
+  };
+}
+
+export function detectCategoryFromChecklist(selectedLabels) {
+  if (!Array.isArray(selectedLabels) || selectedLabels.length === 0) return null;
+  const counts = { NEAR_MISS: 0, UNSAFE_ACT: 0, UNSAFE_CONDITION: 0 };
+  selectedLabels.forEach(label => {
+    const found = ALL_CHECKLIST_ITEMS.find(it => it.label === label);
+    if (found) {
+      counts[found.category] = (counts[found.category] || 0) + 1;
+    }
+  });
+
+  let dominantCat = 'NEAR_MISS';
+  let maxCount = -1;
+  ['UNSAFE_ACT', 'UNSAFE_CONDITION', 'NEAR_MISS'].forEach(cat => {
+    if (counts[cat] > maxCount) {
+      maxCount = counts[cat];
+      dominantCat = cat;
+    }
+  });
+
+  const catLabels = {
+    NEAR_MISS: 'NEAR MISS',
+    UNSAFE_ACT: 'UNSAFE ACT',
+    UNSAFE_CONDITION: 'UNSAFE CONDITION'
+  };
+
+  return {
+    category: dominantCat,
+    label: catLabels[dominantCat],
+    counts
+  };
+}
+
 export default function AIAnalysisView() {
   const [reportType, setReportType] = useState('NEAR_MISS');
+  const [inputMode, setInputMode] = useState('DESCRIPTION'); // 'DESCRIPTION' | 'CHECKLIST' (mutually exclusive)
+  const [checklistCategoryFilter, setChecklistCategoryFilter] = useState('ALL');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('Unit 1');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
@@ -866,14 +945,20 @@ export default function AIAnalysisView() {
   const executeInference = async (textToAnalyze, typeToUse, unitToUse, checklistToUse) => {
     const text = (textToAnalyze !== undefined ? textToAnalyze : description).trim();
     const loc = unitToUse || location;
-    const rType = typeToUse || reportType;
     const currentChecklist = checklistToUse !== undefined ? checklistToUse : selectedChecklist;
     const submittedObservation = [
       text,
       ...(currentChecklist || []).map((factor) => `- ${factor}`)
     ].filter(Boolean).join('\n');
 
-    // ALLOW submission when description exists OR at least one checklist factor is selected.
+    // RULE: both checklist and description is not allowed!
+    if (text && currentChecklist && currentChecklist.length > 0) {
+      setValidationError('Simultaneous submission not allowed: Please provide EITHER a field description OR select checklist factors, but not both.');
+      setAnalysisResult(null);
+      setIsAnalyzing(false);
+      return;
+    }
+
     // Only reject when BOTH are empty.
     if (!text && (!currentChecklist || currentChecklist.length === 0)) {
       setValidationError('Please enter a safety observation or select at least one checklist factor.');
@@ -881,6 +966,14 @@ export default function AIAnalysisView() {
       setIsAnalyzing(false);
       return;
     }
+
+    // Respect manual category selection when text description is entered (do not assume!)
+    let determinedCategory = typeToUse || reportType;
+    if (!text && currentChecklist && currentChecklist.length > 0) {
+      const autoCat = detectCategoryFromChecklist(currentChecklist);
+      if (autoCat) determinedCategory = autoCat.category;
+    }
+    const rType = determinedCategory;
 
     setIsAnalyzing(true);
     setAutoSavedInfo(null);
@@ -1134,6 +1227,8 @@ export default function AIAnalysisView() {
   const handleReset = () => {
     setDescription('');
     setLocation('Unit 1');
+    setInputMode('DESCRIPTION');
+    setChecklistCategoryFilter('ALL');
     setAnalysisResult(null);
     setAnalysisStep('');
     setAutoSavedInfo(null);
@@ -1144,36 +1239,42 @@ export default function AIAnalysisView() {
   };
 
   const toggleChecklistItem = (itemLabel) => {
-    setSelectedChecklist((prev) =>
-      prev.includes(itemLabel)
+    setSelectedChecklist((prev) => {
+      const nextList = prev.includes(itemLabel)
         ? prev.filter((label) => label !== itemLabel)
-        : [...prev, itemLabel]
-    );
+        : [...prev, itemLabel];
+
+      const autoCat = detectCategoryFromChecklist(nextList);
+      if (autoCat) {
+        setReportType(autoCat.category);
+      }
+      return nextList;
+    });
     if (validationError) setValidationError('');
     if (analysisResult) setAnalysisResult(null);
   };
 
-  const currentCategoryChecklist = CLASSIFICATION_CHECKLISTS[reportType] || CLASSIFICATION_CHECKLISTS.NEAR_MISS;
-  const descLower = (description || '').toLowerCase();
+  const itemsToFilter = checklistCategoryFilter === 'ALL'
+    ? ALL_CHECKLIST_ITEMS
+    : ALL_CHECKLIST_ITEMS.filter((it) => it.category === checklistCategoryFilter);
+
   const searchLower = checklistSearch.trim().toLowerCase();
 
-  const filteredChecklistOptions = currentCategoryChecklist
-    .map((item) => {
-      const isRelevant = Boolean(
-        descLower.trim() && item.keywords.some((kw) => descLower.includes(kw))
-      );
-      return { ...item, isRelevant };
-    })
-    .filter((item) => {
-      if (!searchLower) return true;
-      return item.label.toLowerCase().includes(searchLower);
-    });
+  const filteredChecklistOptions = itemsToFilter.filter((item) => {
+    if (!searchLower) return true;
+    return item.label.toLowerCase().includes(searchLower) || (item.keywords && item.keywords.some((kw) => kw.includes(searchLower)));
+  });
 
   const handleRunAnalysis = async () => {
     const trimmedDescription = description.trim();
 
-    // ALLOW submission when description exists OR at least one checklist factor is selected.
-    // Only reject when BOTH are empty.
+    // RULE: both checklist and description is not allowed!
+    if (trimmedDescription && selectedChecklist && selectedChecklist.length > 0) {
+      setValidationError('Simultaneous submission not allowed: Please provide EITHER a field description OR select checklist factors, but not both.');
+      setAnalysisResult(null);
+      return;
+    }
+
     if (!trimmedDescription && (!selectedChecklist || selectedChecklist.length === 0)) {
       setValidationError('Please enter a safety observation or select at least one checklist factor.');
       setAnalysisResult(null);
@@ -1182,7 +1283,13 @@ export default function AIAnalysisView() {
 
     setValidationError('');
 
-    await executeInference(trimmedDescription, reportType, location, selectedChecklist);
+    let typeToUse = reportType;
+    if (!trimmedDescription && selectedChecklist.length > 0) {
+      const autoCat = detectCategoryFromChecklist(selectedChecklist);
+      if (autoCat) typeToUse = autoCat.category;
+    }
+
+    await executeInference(trimmedDescription, typeToUse, location, selectedChecklist);
   };
 
   const isUnrelated = isUnrelatedIssue(description, selectedChecklist);
@@ -1296,7 +1403,14 @@ export default function AIAnalysisView() {
                 <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 font-heading">
                   CLASSIFICATION TYPE / SIZE
                 </label>
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase">Select Category</span>
+                {inputMode === 'CHECKLIST' && selectedChecklist.length > 0 && detectCategoryFromChecklist(selectedChecklist) ? (
+                  <span className="text-[11px] font-mono font-bold text-[#FF5A36] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle2 className="w-3 h-3 text-[#FF5A36]" />
+                    Checklist Factor Category: <strong>{detectCategoryFromChecklist(selectedChecklist).label}</strong>
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono font-bold text-slate-500 uppercase">Select Category Manually</span>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-2.5">
                 {[
@@ -1354,72 +1468,124 @@ export default function AIAnalysisView() {
               </div>
             </div>
 
-            {/* Detailed Field Description */}
+            {/* Mutually Exclusive Mode Switcher */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 font-heading">
-                  DETAILED FIELD DESCRIPTION &amp; BARRIER CONTEXT
+                  INPUT METHOD <span className="text-[11px] font-normal text-slate-400 normal-case">(Select ONE — dual input not allowed)</span>
                 </label>
-                <span className={`text-xs sm:text-sm font-mono font-black ${description.length >= 100 ? 'text-[#FF5A36]' : 'text-slate-500'}`}>
-                  {description.length} / 100 CHARACTERS
+                <span className="text-[11px] font-mono font-bold text-slate-500">
+                  {inputMode === 'DESCRIPTION' ? '✍️ Mode: Text Explanation' : '📋 Mode: Safety Checklists'}
                 </span>
               </div>
-              <textarea
-                rows={5}
-                maxLength={100}
-                value={description}
-                onChange={(e) => {
-                  const val = e.target.value.slice(0, 100);
-                  setDescription(val);
-                  if (validationError) setValidationError('');
-                  if (analysisResult) setAnalysisResult(null);
-                }}
-                className="w-full p-4 rounded-xl bg-[#FAF8F5] border-2 border-stone-200 text-sm sm:text-base font-semibold text-slate-900 leading-relaxed focus:outline-none focus:bg-white focus:border-[#FF5A36] focus:ring-4 focus:ring-[#FF5A36]/10 placeholder:text-slate-400 placeholder:font-normal transition-all"
-                placeholder="Describe safety incident (up to 100 characters max)..."
-              />
-            </div>
 
-            {/* Interactive Controls: Checklist with Search */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                {/* Checklist Toggle Button */}
+              <div className="grid grid-cols-2 gap-2 bg-stone-100 p-1.5 rounded-2xl border border-stone-200">
                 <button
                   type="button"
-                  id="toggle-checklist-btn"
-                  onClick={() => setShowChecklist((prev) => !prev)}
-                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold font-mono tracking-wide transition-all cursor-pointer flex items-center gap-2 border-2 ${
-                    showChecklist
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                      : 'bg-[#FAF8F5] text-slate-700 border-stone-200/90 hover:bg-stone-100 hover:border-stone-300 hover:text-slate-900'
+                  onClick={() => {
+                    setInputMode('DESCRIPTION');
+                    setSelectedChecklist([]);
+                    if (validationError) setValidationError('');
+                  }}
+                  className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold font-mono tracking-wide transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                    inputMode === 'DESCRIPTION'
+                      ? 'bg-white text-slate-900 border-stone-300 shadow-sm'
+                      : 'text-slate-600 border-transparent hover:text-slate-900'
                   }`}
-                  title={showChecklist ? 'Hide safety factors checklist' : 'Display safety factors checklist'}
                 >
-                  <CheckSquare className="w-3.5 h-3.5 text-[#FF5A36]" />
-                  <span>Checklist</span>
+                  <FileText className="w-4 h-4 text-[#FF5A36]" />
+                  <span>1. Detailed Explanation</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputMode('CHECKLIST');
+                    setDescription('');
+                    setShowChecklist(true);
+                    if (validationError) setValidationError('');
+                  }}
+                  className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold font-mono tracking-wide transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                    inputMode === 'CHECKLIST'
+                      ? 'bg-white text-slate-900 border-stone-300 shadow-sm'
+                      : 'text-slate-600 border-transparent hover:text-slate-900'
+                  }`}
+                >
+                  <CheckSquare className="w-4 h-4 text-[#FF5A36]" />
+                  <span>2. Safety Checklists</span>
                   {selectedChecklist.length > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FF5A36] text-white">
                       {selectedChecklist.length}
                     </span>
                   )}
-                  <span className="text-[10px] font-mono ml-0.5">{showChecklist ? '▲' : '▼'}</span>
                 </button>
               </div>
+            </div>
 
-              {/* Expandable Panel: Dynamic Safety Factors Checklist with Search Bar */}
-              {showChecklist && (
+            {/* Mode 1: Free-Text Detailed Explanation */}
+            {inputMode === 'DESCRIPTION' && (
+              <div className="space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 font-heading">
+                    DETAILED FIELD EXPLANATION
+                  </label>
+                  <span className={`text-xs sm:text-sm font-mono font-black ${description.length >= 100 ? 'text-[#FF5A36]' : 'text-slate-500'}`}>
+                    {description.length} / 100 CHARACTERS
+                  </span>
+                </div>
+                <textarea
+                  rows={5}
+                  maxLength={100}
+                  value={description}
+                  onChange={(e) => {
+                    const val = e.target.value.slice(0, 100);
+                    setDescription(val);
+                    if (validationError) setValidationError('');
+                    if (analysisResult) setAnalysisResult(null);
+                  }}
+                  className="w-full p-4 rounded-xl bg-[#FAF8F5] border-2 border-stone-200 text-sm sm:text-base font-semibold text-slate-900 leading-relaxed focus:outline-none focus:bg-white focus:border-[#FF5A36] focus:ring-4 focus:ring-[#FF5A36]/10 placeholder:text-slate-400 placeholder:font-normal transition-all"
+                  placeholder="Describe safety incident in detail..."
+                />
+                <p className="text-[11px] font-mono text-slate-400 italic">
+                  * Note: Classification (Near Miss, Unsafe Act, or Unsafe Condition) is selected manually above. Checklists are locked in Explanation Mode.
+                </p>
+              </div>
+            )}
+
+            {/* Mode 2: Structured Safety Checklists */}
+            {inputMode === 'CHECKLIST' && (
+              <div className="space-y-3 animate-in fade-in duration-200">
+                {/* Description Locked Notice */}
+                <div className="p-3.5 rounded-xl bg-stone-100/90 border border-dashed border-stone-300 text-xs font-mono text-slate-600 flex items-center justify-between">
+                  <span>✍️ Field description is disabled in Checklist Mode ({selectedChecklist.length} selected).</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('DESCRIPTION');
+                      setSelectedChecklist([]);
+                    }}
+                    className="text-[#FF5A36] hover:text-orange-700 font-bold underline cursor-pointer"
+                  >
+                    Switch to Explanation Mode
+                  </button>
+                </div>
+
+                {/* Structured Checklists Panel */}
                 <div 
                   id="safety-factors-checklist-panel"
-                  className="p-4 sm:p-5 rounded-xl bg-[#FAF8F5] border-2 border-stone-200 text-slate-800 space-y-3 animate-in fade-in duration-200 shadow-xs"
+                  className="p-4 sm:p-5 rounded-xl bg-[#FAF8F5] border-2 border-stone-200 text-slate-800 space-y-3.5 shadow-xs"
                 >
                   {/* Panel Top: Title & Classification indicator */}
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 font-heading">
                         Select Safety Factors
                       </span>
-                      <span className="text-[10px] font-mono font-bold text-[#FF5A36] uppercase px-2 py-0.5 bg-orange-100/80 rounded-md">
-                        {reportType === 'NEAR_MISS' ? 'Near Miss' : reportType === 'UNSAFE_ACT' ? 'Unsafe Act' : 'Unsafe Condition'}
-                      </span>
+                      {selectedChecklist.length > 0 && detectCategoryFromChecklist(selectedChecklist) && (
+                        <span className="text-[10px] font-mono font-bold text-[#FF5A36] uppercase px-2 py-0.5 bg-orange-100/80 rounded-md border border-orange-200">
+                          Identified: {detectCategoryFromChecklist(selectedChecklist).label}
+                        </span>
+                      )}
                     </div>
                     {selectedChecklist.length > 0 && (
                       <button
@@ -1432,6 +1598,29 @@ export default function AIAnalysisView() {
                     )}
                   </div>
 
+                  {/* Category Filter Tabs */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {[
+                      { id: 'ALL', label: 'All Factors', count: ALL_CHECKLIST_ITEMS.length },
+                      { id: 'NEAR_MISS', label: 'Near Miss', count: CLASSIFICATION_CHECKLISTS.NEAR_MISS.length },
+                      { id: 'UNSAFE_ACT', label: 'Unsafe Act', count: CLASSIFICATION_CHECKLISTS.UNSAFE_ACT.length },
+                      { id: 'UNSAFE_CONDITION', label: 'Unsafe Condition', count: CLASSIFICATION_CHECKLISTS.UNSAFE_CONDITION.length }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setChecklistCategoryFilter(tab.id)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer whitespace-nowrap border ${
+                          checklistCategoryFilter === tab.id
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                            : 'bg-white text-slate-600 border-stone-200 hover:bg-stone-50 hover:text-slate-900'
+                        }`}
+                      >
+                        {tab.label} ({tab.count})
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Search Bar Input */}
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1442,7 +1631,7 @@ export default function AIAnalysisView() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') e.preventDefault();
                       }}
-                      placeholder="Search safety factors..."
+                      placeholder="Search safety factors across categories..."
                       className="w-full pl-9 pr-8 py-2 rounded-lg bg-white border border-stone-200 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:border-[#FF5A36] focus:ring-2 focus:ring-[#FF5A36]/20 transition-all placeholder:text-slate-400"
                     />
                     {checklistSearch && (
@@ -1463,10 +1652,9 @@ export default function AIAnalysisView() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {filteredChecklistOptions.map((opt) => {
                           const isSelected = selectedChecklist.includes(opt.label);
-                          const isSuggested = opt.isRelevant;
                           return (
                             <label
-                              key={opt.id}
+                              key={`${opt.category}_${opt.id}`}
                               className={`flex items-center gap-2.5 p-2.5 rounded-lg border text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none ${
                                 isSelected
                                   ? 'bg-orange-50/90 border-[#FF5A36] text-slate-900 shadow-2xs font-bold'
@@ -1487,34 +1675,32 @@ export default function AIAnalysisView() {
                                 {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                               </div>
                               <span className="flex-1 leading-snug">{opt.label}</span>
-                              {isSuggested && !isSelected && (
-                                <span className="text-[10px] font-mono font-bold text-orange-600 bg-orange-100/80 px-1.5 py-0.5 rounded shrink-0">
-                                  Relevant
-                                </span>
-                              )}
+                              <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${opt.badgeClass}`}>
+                                {opt.categoryLabel}
+                              </span>
                             </label>
                           );
                         })}
                       </div>
                     ) : (
                       <div className="py-8 text-center text-xs sm:text-sm font-semibold text-slate-400 bg-white rounded-lg border border-dashed border-stone-200">
-                        No matching safety factors
+                        No matching safety factors found
                       </div>
                     )}
                   </div>
 
-                  {/* Panel Footer: Selected Count */}
+                  {/* Panel Footer */}
                   <div className="pt-2 border-t border-stone-200 flex items-center justify-between text-xs font-mono text-slate-500">
                     <span>
-                      Showing {filteredChecklistOptions.length} of {currentCategoryChecklist.length} factors
+                      Showing {filteredChecklistOptions.length} of {itemsToFilter.length} factors
                     </span>
                     <span className="font-bold text-slate-700">
                       {selectedChecklist.length} selected
                     </span>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Large Action Button with Validation Error Banner */}

@@ -78,13 +78,25 @@ def get_organization_reports(
 
     reports = query.order_by(desc(SafetyReport.created_at)).all()
     
+    from ..ai_services.sif_assessment import compute_maut_risk_score
+
     result = []
     for r in reports:
         sif_assessment = None
         identified_hazard = None
+        ai_score = None
+        sif_confidence = None
         if r.ai_analysis:
             sif_assessment = r.ai_analysis.sif_precursor_assessment
             identified_hazard = r.ai_analysis.identified_hazard
+            ai_score = compute_maut_risk_score(
+                hazard=r.ai_analysis.identified_hazard,
+                energy_source=r.ai_analysis.energy_source,
+                exposure=r.ai_analysis.exposure,
+                barrier_status=r.ai_analysis.barrier_information or "BARRIER_INSUFFICIENT_INFO",
+                text=r.description or ""
+            )
+            sif_confidence = 90.0 if sif_assessment == "YES" else 85.0
             
         result.append(SafetyReportListItem(
             id=r.id,
@@ -100,6 +112,8 @@ def get_organization_reports(
             analysis_status=r.analysis_status,
             sif_precursor_assessment=sif_assessment,
             identified_hazard=identified_hazard,
+            ai_score=ai_score,
+            sif_confidence=sif_confidence,
             created_at=r.created_at
         ))
     return result

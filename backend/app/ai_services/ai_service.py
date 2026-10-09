@@ -13,7 +13,8 @@ from .life_saving_rules import map_life_saving_rules
 def analyze_safety_report(
     report_type: str,
     description: str,
-    additional_context: Optional[str] = None
+    additional_context: Optional[str] = None,
+    legacy_scoring: bool = False
 ) -> Dict[str, Any]:
     """
     Executes the modular AI/NLP Safety Intelligence Pipeline:
@@ -57,7 +58,7 @@ def analyze_safety_report(
     # 8. Life-Saving Rules Evaluation (All 9 IOGP Rules)
     lsr_match = map_life_saving_rules(cleaned_text)
 
-    # 9. Hybrid SIF Decision Engine (Rule Assessment + ML Probability + Cumulative Multi-Hazard MAUT Risk Score)
+    # 9. Hybrid SIF Decision Engine (Rule Assessment + ML Probability + Gated Monotonic / MAUT Risk Score)
     sif_result = assess_sif_precursor(
         report_type=report_type,
         text=cleaned_text,
@@ -67,7 +68,8 @@ def analyze_safety_report(
         barrier_status=barrier_eval.get("status", "BARRIER_INSUFFICIENT_INFO"),
         signals=safety_signals,
         all_hazards=all_detected_hazards,
-        all_energy_sources=energy_exposure.get("all_energy_sources", [])
+        all_energy_sources=energy_exposure.get("all_energy_sources", []),
+        legacy_scoring=legacy_scoring
     )
 
     # Parse structured checklist safety factors from additional_context
@@ -120,6 +122,8 @@ def analyze_safety_report(
         "ai_sif_score": sif_result.get("ai_sif_score", 25),
         "ai_confidence": sif_result.get("ai_confidence", 85.0),
         "contributing_features": sif_result.get("contributing_features", []),
+        "score_breakdown": sif_result.get("score_breakdown", {}),
+        "override_rule_applied": sif_result.get("override_rule_applied"),
         "life_saving_rule": lsr_match,
         "extracted_entities": extracted_info,
         "explanation": explanation

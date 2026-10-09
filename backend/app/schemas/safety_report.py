@@ -24,6 +24,8 @@ class SafetyReportListItem(BaseModel):
     analysis_status: str
     sif_precursor_assessment: Optional[str] = None
     identified_hazard: Optional[str] = None
+    ai_score: Optional[int] = None
+    sif_confidence: Optional[float] = None
     created_at: datetime
 
     class Config:

@@ -10,6 +10,7 @@ from ..schemas.ai_analysis import AIAnalysisResponse, AIAnalysisRequest, AIAnaly
 from ..schemas.safety_report import SafetyReportCreate
 from .report_service import find_duplicate_report, create_report
 from .historical_pattern_service import detect_and_update_weak_signals
+from ..ai_services.context_analyzer import classify_incident_category
 
 FREE_TEXT_FALLBACK = "No free-text observation provided."
 
@@ -130,17 +131,36 @@ def execute_direct_analysis(
     """
     description = (request.report_text or "").strip()
     location = (request.location or "Unit 1").strip()
-    norm_type = (request.report_type or "NEAR_MISS").strip().upper().replace("-", "_").replace(" ", "_")
-    if norm_type not in ["UNSAFE_ACT", "UNSAFE_CONDITION", "NEAR_MISS"]:
-        norm_type = "NEAR_MISS"
     report_date = (request.report_date or datetime.utcnow().strftime("%Y-%m-%d")).strip()
 
     # Explicitly extract and initialize selected checklist safety factors at the top
     checklist_items: List[str] = []
     if request.additional_context:
         ctx_val = request.additional_context if isinstance(request.additional_context, str) else ", ".join(str(x) for x in request.additional_context)
-        factors_text = ctx_val.replace("Safety Factors:", "").strip()
-        checklist_items = [f.strip() for f in re.split(r'[,;]\s*', factors_text) if f.strip()]
+        if "Safety Factors:" in ctx_val:
+            factors_text = ctx_val.replace("Safety Factors:", "").strip()
+            checklist_items = [f.strip() for f in re.split(r'[,;]\s*', factors_text) if f.strip()]
+
+    # Mutual exclusivity: both checklist and description is not allowed!
+    if description and checklist_items:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Dual submission not allowed: Please provide either a detailed description OR select checklist factors, but not both."
+        )
+
+    # Category selection: When entering description, DO NOT assume or override category;
+    # strictly honor the user's manual selection!
+    if description:
+        raw_req_type = (request.report_type or "NEAR_MISS").strip().upper().replace("-", "_").replace(" ", "_")
+        if raw_req_type in ["UNSAFE_ACT", "UNSAFE_CONDITION", "NEAR_MISS"]:
+            norm_type = raw_req_type
+        else:
+            norm_type = "NEAR_MISS"
+    elif checklist_items:
+        cat_info = classify_incident_category(" ".join(checklist_items))
+        norm_type = cat_info["category"]
+    else:
+        norm_type = "NEAR_MISS"
 
     # Format analysis input based on whether description and/or checklist factors exist
     if not description and checklist_items:
@@ -163,7 +183,8 @@ def execute_direct_analysis(
     raw_result = analyze_safety_report(
         report_type=norm_type,
         description=desc_to_analyze,
-        additional_context=request.additional_context
+        additional_context=request.additional_context,
+        legacy_scoring=getattr(request, "legacy_scoring", False) or False
     )
 
     # Dynamic Location Extraction: prioritize explicit request location, then text extracted location
@@ -253,139 +274,93 @@ def execute_direct_analysis(
     c_lower = " ".join(checklist_items).lower()
     comb_lower = f"{t_lower} {h_lower} {c_lower}"
 
-    if "loto" in comb_lower or "lockout" in comb_lower or "isolation" in comb_lower:
-        recommended_controls = [
-            "Immediately stop work and perform positive Lockout/Tagout (LOTO) energy isolation.",
-            "Verify zero-energy state with calibrated instruments before entering work zone.",
-            "Apply individual safety padlocks and danger tags to all energy isolation points.",
-            "Review Isolation Certificate and verify try-step with authorized supervisor."
-        ]
-        corrective_actions = [
-            "Conduct safety stand-down on Life-Saving Rule: Energy Isolation (LSR-01).",
-            "Audit facility energy isolation and LOTO verification field procedures."
-        ]
-    elif "confined" in comb_lower or "tank entry" in comb_lower or "vessel entry" in comb_lower:
-        recommended_controls = [
-            "Stop entry immediately; conduct atmospheric gas testing (0% LEL, 19.5-23.5% O2, 0 ppm toxic).",
-            "Verify valid Confined Space Entry Permit and assign dedicated standby sentry.",
-            "Maintain continuous forced ventilation and calibrated multi-gas monitor.",
-            "Confirm emergency rescue plan and retrieval tripod/harness are positioned at entrance."
-        ]
-        corrective_actions = [
-            "Audit confined space atmospheric testing protocols and authorization permits.",
-            "Conduct mandatory retraining on Confined Space Entry procedures."
-        ]
-    elif "high pressure" in comb_lower or "high-pressure" in comb_lower or "pressurized" in comb_lower:
-        recommended_controls = [
-            "Isolate upstream pressure supply and depressurize system to 0 PSI before inspection.",
-            "Barricade pressure exclusion zone and position personnel outside the line of fire.",
-            "Inspect high-pressure whip-checks, hammer unions, and manifold connections.",
-            "Verify pressure bleed-off valves are locked open and tagged."
-        ]
-        corrective_actions = [
-            "Conduct pressure systems integrity audit and inspect line securement devices.",
-            "Brief operations personnel on high-pressure line-of-fire hazard controls."
-        ]
-    elif "dropped" in comb_lower or "line of fire" in comb_lower or "suspended load" in comb_lower or "struck" in comb_lower:
-        recommended_controls = [
-            "Barricade drop zone and prohibit personnel from walking under dynamic trajectories.",
-            "Inspect tool tethering, secondary retention nets, and overhead securement.",
-            "Ensure clear communication and spotter assignment during overhead/moving tasks.",
-            "Verify personnel maintain safe clearance outside the line of fire."
-        ]
-        corrective_actions = [
-            "Audit drop-prevention controls and tool lanyards across working areas.",
-            "Conduct safety stand-down on line-of-fire hazard recognition."
-        ]
-    elif "water" in comb_lower and ("electrical" in comb_lower or "panel" in comb_lower):
-        recommended_controls = [
-            "De-energize electrical panel immediately and establish barrier cordon.",
-            "Identify and isolate the source of water leakage.",
-            "Inspect panel enclosure for water ingress and perform insulation resistance test.",
-            "Verify dry, safe conditions before restoring electrical power."
-        ]
-        corrective_actions = [
-            "Permanent pipe/roof repair to eliminate water path above electrical gear.",
-            "Recertify electrical insulation integrity before re-energizing."
-        ]
-    elif "gas" in comb_lower or "hydrocarbon" in comb_lower or "leak" in comb_lower:
-        recommended_controls = [
-            "Isolate upstream supply valve and depressurize affected line segment.",
-            "Evacuate area and perform continuous atmospheric gas testing (0% LEL).",
-            "Inspect flange gasket, valve seals, and fittings for degradation.",
-            "Establish safety exclusion perimeter until re-pressurization tests pass."
-        ]
-        corrective_actions = [
-            "Replace degraded flange gasket/valve seal and verify with leak detection.",
-            "Log containment inspection in process safety integrity tracking register."
-        ]
-    elif "slip" in comb_lower or "slippery" in comb_lower:
-        recommended_controls = [
-            "Inspect and rectify the slippery surface, identify the source of moisture/oil.",
-            "Provide warning signage and prevent pedestrian exposure until corrected.",
-            "Clean and dry the affected area immediately with compatible absorbent.",
-            "Verify the area during routine post-shift safety inspection."
-        ]
-        corrective_actions = [
-            "Rectify drainage defect or fluid source causing surface slickness.",
-            "Log routine maintenance inspection in CMMS ledger."
-        ]
-    elif "exit" in comb_lower or "egress" in comb_lower or "blocked" in comb_lower:
-        recommended_controls = [
-            "Immediately clear designated emergency exit and evacuation route.",
-            "Remove all stored obstructions, boxes, and materials from doorway.",
-            "Conduct walkdown of all emergency egress pathways in facility.",
-            "Brief area shift personnel on maintaining 100% unobstructed exit access."
-        ]
-        corrective_actions = [
-            "Mark floor with yellow hatching 'Keep Clear At All Times'.",
-            "Audit facility egress compliance during weekly safety committee walk."
-        ]
-    elif "tools" in comb_lower or "housekeeping" in comb_lower or "stacked" in comb_lower:
-        recommended_controls = [
-            "Clear unattended tools and materials from walkway immediately.",
-            "Restack materials and boxes within designated weight and height limits.",
-            "Conduct routine housekeeping walkdown across working area.",
-            "Ensure tools are stored in designated tool racks or containers."
-        ]
-        corrective_actions = [
-            "Implement 5S housekeeping standard across working bays.",
-            "Verify aisle clearance during end-of-shift handover."
-        ]
-    elif "ppe" in comb_lower or "safety glasses" in comb_lower or "helmet" in comb_lower or "goggles" in comb_lower:
-        recommended_controls = [
-            "Provide required safety equipment / PPE immediately before worker continues task.",
-            "Brief frontline team on mandatory 100% PPE compliance in operational areas.",
-            "Verify all personnel on shift are equipped with inspected PPE.",
-            "Document observation in shift safety briefing log."
-        ]
-        corrective_actions = [
-            "Conduct shift safety stand-down on Life-Saving Rule personal accountability.",
-            "Ensure frontline supervisor enforces pre-task PPE checks."
-        ]
-    elif is_sif:
-        recommended_controls = [
-            "Immediately trigger Emergency Shutdown (ESD) or line isolation valve",
-            "Evacuate personnel upwind and establish a 50-meter safety exclusion zone",
-            "Conduct continuous multi-gas / zero-energy verification before re-entry",
-            "Depressurize and lock-out / tag-out all upstream energy sources"
-        ]
-        corrective_actions = [
-            "Issue Stop-Work Notice and stand down operating shift team",
-            "Dispatch Field HSE Superintendent for barrier integrity inspection",
-            "Log high-priority CAPA item in corporate safety intelligence system"
-        ]
-    else:
-        recommended_controls = [
-            "Conduct immediate walkdown inspection to identify hazard root cause",
-            "Implement appropriate physical controls and warning demarcation",
-            "Verify area condition during regular shift safety inspections",
-            "Log findings in facility safety maintenance tracking register"
-        ]
-        corrective_actions = [
-            "Log routine maintenance inspection in CMMS ledger",
-            "Review standard operating procedures with shift crew"
-        ]
+    rec_list: List[str] = []
+    capa_list: List[str] = []
+
+    # 1. High-Energy Electrical Controls
+    if any(k in comb_lower for k in ["electrical", "arc flash", "cable", "voltage", "panel", "busbar"]):
+        rec_list.append("De-energize electrical circuit and perform positive Lockout/Tagout (LOTO).")
+        rec_list.append("Verify zero-voltage state with calibrated test instrument before contact.")
+        capa_list.append("Conduct safety stand-down on Life-Saving Rule: Energy Isolation (LSR-01).")
+
+    # 2. Machine & Equipment Failure Controls
+    if any(k in comb_lower for k in ["equipment failure", "machine", "mechanical", "guard", "malfunction", "breakdown", "defect"]):
+        rec_list.append("Isolate equipment power and tag out-of-service until certified maintenance inspection.")
+        rec_list.append("Inspect physical machine safeguards, interlocks, and mechanical components.")
+        capa_list.append("Review machine preventive maintenance ledger and recertify safeguard integrity.")
+
+    # 3. Fire, Hot Work & Gas Controls
+    if any(k in comb_lower for k in ["fire", "blast", "ignition", "hot work", "gas", "flammable", "hydrocarbon"]):
+        rec_list.append("Immediately trigger Emergency Shutdown (ESD) or line isolation valve.")
+        rec_list.append("Perform continuous atmospheric gas testing (0% LEL) and station a certified fire watch.")
+        capa_list.append("Audit Hot Work Permits and combustible gas detection sensor calibration.")
+
+    # 4. Confined Space Controls
+    if any(k in comb_lower for k in ["confined", "tank entry", "vessel entry"]):
+        rec_list.append("Stop entry immediately; conduct atmospheric gas testing (0% LEL, 19.5-23.5% O2, 0 ppm toxic).")
+        rec_list.append("Verify valid Confined Space Entry Permit and assign dedicated standby sentry.")
+        capa_list.append("Conduct mandatory retraining on Confined Space Entry procedures.")
+
+    # 5. High Pressure Controls
+    if any(k in comb_lower for k in ["high pressure", "high-pressure", "pressurized", "hydraulic"]):
+        rec_list.append("Isolate upstream pressure supply and depressurize system to 0 PSI before inspection.")
+        rec_list.append("Barricade pressure exclusion zone and position personnel outside the line of fire.")
+        capa_list.append("Conduct pressure systems integrity audit and inspect line securement devices.")
+
+    # 6. Fall from Height & Scaffolding Controls
+    if any(k in comb_lower for k in ["height", "fall", "scaffold", "ladder"]):
+        rec_list.append("Ensure certified 100% tie-off with inspected harness and lanyard.")
+        rec_list.append("Install top-rail, mid-rail, and toe-board fall protection barriers.")
+        capa_list.append("Audit working-at-height permits and inspect fall arrest anchorage points.")
+
+    # 7. Suspended Load Controls
+    if any(k in comb_lower for k in ["dropped", "line of fire", "line-of-fire", "suspended load", "struck", "crane", "rigging"]):
+        rec_list.append("Barricade drop zone and prohibit personnel from walking under suspended loads.")
+        rec_list.append("Verify personnel maintain safe clearance outside the dynamic line of fire.")
+        capa_list.append("Audit drop-prevention controls and tool lanyards across working areas.")
+
+    # 8. Surface Slip / Trip / Housekeeping Controls
+    if any(k in comb_lower for k in ["slip", "trip", "slippery", "housekeeping", "walkway", "floor"]):
+        rec_list.append("Inspect and rectify the slippery surface; clean and dry affected area with absorbent.")
+        rec_list.append("Provide warning signage and prevent pedestrian exposure until corrected.")
+        capa_list.append("Rectify drainage defect or fluid source causing surface slickness.")
+
+    # Default fallback if no specific hazard matched
+    if not rec_list:
+        if is_sif:
+            rec_list = [
+                "Immediately trigger Emergency Shutdown (ESD) or line isolation valve",
+                "Evacuate personnel upwind and establish a 50-meter safety exclusion zone",
+                "Conduct continuous multi-gas / zero-energy verification before re-entry"
+            ]
+            capa_list = [
+                "Issue Stop-Work Notice and stand down operating shift team",
+                "Dispatch Field HSE Superintendent for barrier integrity inspection"
+            ]
+        else:
+            rec_list = [
+                "Conduct immediate walkdown inspection to identify hazard root cause",
+                "Implement appropriate physical controls and warning demarcation",
+                "Verify area condition during regular shift safety inspections"
+            ]
+            capa_list = [
+                "Log routine maintenance inspection in CMMS ledger",
+                "Review standard operating procedures with shift crew"
+            ]
+
+    # Deduplicate while preserving order
+    def _dedup(items):
+        seen = set()
+        res = []
+        for x in items:
+            if x not in seen:
+                seen.add(x)
+                res.append(x)
+        return res
+
+    recommended_controls = _dedup(rec_list)[:4]
+    corrective_actions = _dedup(capa_list)[:2]
+
 
     # Report Name: prioritize actual AI-identified hazard
     if raw_result.get("identified_hazard") and raw_result["identified_hazard"] not in ["Insufficient Information", "General Operational Observation"]:
@@ -534,6 +509,8 @@ def execute_direct_analysis(
         ml_probability=raw_result.get("ml_probability", 0.0),
         final_ai_decision=raw_result.get("final_ai_decision", determination_status),
         contributing_features=raw_result.get("contributing_features", []),
+        score_breakdown=raw_result.get("score_breakdown"),
+        override_rule_applied=raw_result.get("override_rule_applied"),
         human_classification=None,
         human_sif_score=None,
         reviewer_feedback=None,

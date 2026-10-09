@@ -32,6 +32,7 @@ class AIAnalysisRequest(BaseModel):
     site: Optional[str] = None
     report_date: Optional[str] = None
     additional_context: Optional[Union[str, List[str]]] = None
+    legacy_scoring: Optional[bool] = Field(default=False, description="Enable legacy additive MAUT risk scoring model for comparison")
 
     @model_validator(mode="before")
     @classmethod
@@ -88,6 +89,8 @@ class AIAnalysisExecuteResponse(BaseModel):
     ml_probability: Optional[float] = None
     final_ai_decision: Optional[str] = None
     contributing_features: Optional[List[Dict[str, Any]]] = []
+    score_breakdown: Optional[Dict[str, Any]] = None
+    override_rule_applied: Optional[str] = None
 
     # Human-In-The-Loop Governance Fields
     human_classification: Optional[str] = None

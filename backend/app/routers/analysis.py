@@ -11,117 +11,126 @@ from ..services.analysis_service import get_organization_analyses, execute_direc
 from ..ai_services.ai_service import analyze_safety_report
 from ..ai_services.signal_correlation import detect_latent_weak_signals_in_text
 from ..ai_services.safety_validity import classify_safety_observation_validity
+from ..ai_services.context_analyzer import classify_incident_category
 
 router = APIRouter(prefix="/api/analysis", tags=["AI Analysis"])
 ai_analysis_router = APIRouter(prefix="/api/ai-analysis", tags=["AI Analysis"])
 
 class LiveAnalysisRequest(BaseModel):
-    report_text: str
+    report_text: Optional[str] = ""
+    description: Optional[str] = ""
     report_name: Optional[str] = None
-    report_type: Optional[str] = "Near Miss"
+    report_type: Optional[str] = None
+    classification: Optional[str] = None
     location: Optional[str] = None
+    operating_unit: Optional[str] = None
     site: Optional[str] = None
     report_date: Optional[str] = None
+    checklist: Optional[List[str]] = None
+    selected_checklist: Optional[List[str]] = None
+    additional_context: Optional[str] = None
+    legacy_scoring: Optional[bool] = False
 
 def generate_dynamic_recommendations(hazard: Optional[str], text: str) -> List[str]:
     h_low = (hazard or "").lower()
     t_low = text.lower()
-    if "slip" in h_low or "slip" in t_low or "slippery" in t_low:
-        return [
-            "Inspect and rectify the slippery surface, identify the source of moisture/oil.",
-            "Provide warning signage and prevent pedestrian exposure until corrected.",
-            "Clean and dry the affected area immediately with appropriate absorbent.",
-            "Verify the area during routine post-shift safety inspection."
-        ]
-    elif "water" in t_low and ("electrical" in t_low or "panel" in t_low):
-        return [
-            "De-energize electrical panel immediately and establish barrier cordon.",
-            "Identify and isolate the source of water leakage.",
-            "Inspect panel enclosure for water ingress and perform insulation resistance test.",
-            "Verify dry, safe conditions before restoring electrical power."
-        ]
-    elif "electrical" in h_low or "arc" in h_low or "cable" in h_low:
-        return [
-            "De-energize electrical circuit and perform Lockout/Tagout (LOTO).",
-            "Verify zero voltage using a calibrated test instrument before contact.",
-            "Inspect enclosure, insulation, and conductors for thermal or physical damage.",
-            "Secure loose cables into protective conduit away from walkways."
-        ]
-    elif "exit" in t_low or "egress" in h_low or "blocked" in t_low:
-        return [
-            "Immediately clear designated emergency exit and evacuation route.",
-            "Remove all stored obstructions, boxes, and materials from doorway.",
-            "Conduct walkdown of all emergency egress pathways in facility.",
-            "Brief area shift personnel on maintaining 100% unobstructed exit access."
-        ]
-    elif "helmet" in t_low or "head" in h_low or ("ppe" in h_low and "without" in t_low):
-        return [
-            "Provide required safety helmet immediately before worker continues task.",
-            "Brief frontline team on mandatory 100% PPE compliance in operational areas.",
-            "Verify all personnel on shift are equipped with inspected PPE.",
-            "Document observation in shift safety briefing log."
-        ]
-    elif "tools" in t_low or "housekeeping" in h_low or "stacked" in t_low:
-        return [
-            "Clear unattended tools and materials from walkway immediately.",
-            "Restack materials and boxes within designated weight and height limits.",
-            "Conduct routine housekeeping walkdown across working area.",
-            "Ensure tools are stored in designated tool racks or containers."
-        ]
-    elif "gas" in h_low or "pressure" in h_low or "pipe" in h_low or "leak" in h_low:
-        return [
-            "Isolate upstream supply valve and depressurize affected line segment.",
-            "Evacuate area upwind and perform continuous atmospheric gas testing (0% LEL).",
-            "Inspect flange gasket, valve seals, and fittings for degradation.",
-            "Establish safety exclusion perimeter until re-pressurization tests pass."
-        ]
-    elif "guard" in t_low or "machine" in h_low or "mechanical" in h_low:
-        return [
-            "Isolate equipment and install compliant machine guard before operation.",
-            "Inspect interlock switches and secure physical fastenings.",
-            "Tag equipment out-of-service until safety guarding is verified intact.",
-            "Review machine safeguard pre-use checklist with operators."
-        ]
-    elif "forklift" in t_low or "vehicle" in h_low or "pedestrian" in t_low:
-        return [
-            "Reinforce pedestrian and mobile vehicle segregation barriers.",
-            "Verify forklift reverse horn, beacon lamp, and operator speed compliance.",
-            "Designate dedicated marshaller during vehicle movement in congested zones.",
-            "Review line-of-sight and blind spot awareness during toolbox talk."
-        ]
-    elif "height" in h_low or "fall" in h_low or "scaffold" in h_low:
-        return [
-            "Ensure certified 100% tie-off with inspected harness and lanyard.",
-            "Install top-rail, mid-rail, and toe-board fall protection barriers.",
-            "Red-tag scaffold or ladder until certified inspection sign-off.",
-            "Clear walkway of trip hazards and verify secure planking."
-        ]
-    elif "load" in h_low or "crane" in h_low or "rigging" in h_low:
-        return [
-            "Barricade drop zone and prohibit personnel from walking under suspended loads.",
-            "Inspect rigging slings, hooks, and shackles for wear before lifting.",
-            "Verify crane operator and rigger certifications and review lift plan.",
-            "Use tag lines to control load swing from a safe distance."
-        ]
-    elif "chemical" in h_low:
-        return [
-            "Deploy chemical spill kit and contain runoff with compatible absorbent.",
-            "Wear appropriate chemical-resistant gloves, goggles, and respiratory PPE.",
-            "Review Safety Data Sheet (SDS) for specific neutralization protocols.",
-            "Ventilate area and verify integrity of primary chemical containers."
-        ]
-    else:
-        return [
+    comb = f"{h_low} {t_low}"
+    
+    controls: List[str] = []
+    
+    # 1. High-Energy Electrical Priority
+    if any(k in comb for k in ["electrical", "arc flash", "cable", "voltage", "panel", "busbar"]):
+        controls.append("De-energize electrical circuit and perform positive Lockout/Tagout (LOTO).")
+        controls.append("Verify zero-voltage state with calibrated test instrument before contact.")
+        
+    # 2. Machine & Equipment Failure Priority
+    if any(k in comb for k in ["equipment failure", "machine", "mechanical", "guard", "malfunction", "breakdown"]):
+        controls.append("Isolate equipment power and tag out-of-service until certified maintenance inspection.")
+        controls.append("Inspect physical machine safeguards, interlocks, and mechanical components.")
+        
+    # 3. Fire, Hot Work & Combustible Gas Priority
+    if any(k in comb for k in ["fire", "blast", "ignition", "hot work", "gas", "flammable", "leak", "hydrocarbon"]):
+        controls.append("Immediately trigger Emergency Shutdown (ESD) or line isolation valve.")
+        controls.append("Perform continuous atmospheric gas testing (0% LEL) and station a certified fire watch.")
+
+    # 4. Confined Space Entry Priority
+    if any(k in comb for k in ["confined", "tank entry", "vessel entry"]):
+        controls.append("Stop entry immediately; conduct multi-gas testing (0% LEL, 19.5-23.5% O2, 0 ppm toxic).")
+        controls.append("Verify Confined Space Entry Permit and assign dedicated standby sentry.")
+
+    # 5. Fall from Height & Scaffolding
+    if any(k in comb for k in ["height", "fall", "scaffold", "ladder"]):
+        controls.append("Ensure certified 100% tie-off with inspected harness and lanyard.")
+        controls.append("Install top-rail, mid-rail, and toe-board fall protection barriers.")
+
+    # 6. Suspended Load & Line of Fire
+    if any(k in comb for k in ["suspended load", "load", "crane", "rigging", "dropped", "line of fire", "line-of-fire", "struck"]):
+        controls.append("Barricade drop zone and prohibit personnel from walking under suspended loads.")
+        controls.append("Verify personnel maintain safe clearance outside the line of fire.")
+
+    # 7. Surface Slip / Trip / Housekeeping
+    if any(k in comb for k in ["slip", "trip", "slippery", "housekeeping", "walkway", "floor"]):
+        controls.append("Inspect and rectify the slippery surface; clean and dry affected area with absorbent.")
+        controls.append("Provide warning signage and prevent pedestrian exposure until corrected.")
+
+    # 8. Emergency Egress & Blocked Exits
+    if any(k in comb for k in ["exit", "egress", "blocked"]):
+        controls.append("Immediately clear designated emergency exit and evacuation route.")
+
+    # Fallback if no specific matched
+    if not controls:
+        controls = [
             "Conduct immediate walkdown inspection to identify hazard root cause.",
             "Implement appropriate physical controls and warning demarcation.",
             "Verify area condition during regular shift safety inspections.",
             "Log findings in facility safety maintenance tracking register."
         ]
+        
+    # Deduplicate while preserving order and return top 4 items
+    seen = set()
+    unique_controls = []
+    for c in controls:
+        if c not in seen:
+            seen.add(c)
+            unique_controls.append(c)
+            
+    return unique_controls[:4]
 
 
 def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
-    text = payload.report_text.strip()
-    r_type = payload.report_type or "Near Miss"
+    raw_text = (payload.report_text or payload.description or "").strip()
+    
+    # Check for checklist items
+    checklist_items = payload.checklist or payload.selected_checklist or []
+    if not checklist_items and payload.additional_context and "Safety Factors:" in payload.additional_context:
+        ctx_factors = payload.additional_context.split("Safety Factors:")[-1].strip()
+        checklist_items = [f.strip() for f in re.split(r'[,;]\s*', ctx_factors) if f.strip()]
+
+    has_text = bool(raw_text)
+    has_checklist = bool(checklist_items and len(checklist_items) > 0)
+
+    # Mutual exclusivity: both checklist and description is not allowed!
+    if has_text and has_checklist:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dual submission not allowed: Please provide either a detailed description OR select checklist factors, but not both."
+        )
+
+    if not has_text and not has_checklist:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide either a detailed description OR select at least one checklist factor."
+        )
+
+    if has_checklist and not has_text:
+        text = f"Safety Factors: {', '.join(checklist_items)}"
+        cat_info = classify_incident_category(" ".join(checklist_items))
+        r_type = payload.report_type or payload.classification or cat_info["label"]
+    else:
+        text = raw_text
+        # Strictly respect user's manual selection when entering description; do not assume
+        r_type = payload.report_type or payload.classification or "Near Miss"
+        cat_info = None
 
     # Multi-Stage Step 1: Safety Observation Validity Layer
     validity = classify_safety_observation_validity(text)
@@ -148,14 +157,16 @@ def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
                 "Enter an operational safety observation with details of conditions or hazards."
             ],
             "explanation": validity["explanation"],
-            "why_identified": {"summary": validity["explanation"]}
+            "why_identified": {"summary": validity["explanation"]},
+            "identified_classification": cat_info
         }
 
     # Run Multi-Stage AI NLP Pipeline
     raw_result = analyze_safety_report(
         report_type=r_type,
         description=text,
-        additional_context=f"Location: {payload.location or 'Not Specified'}"
+        additional_context=f"Location: {payload.location or 'Not Specified'}",
+        legacy_scoring=payload.legacy_scoring or False
     )
 
     hazard = raw_result.get("identified_hazard") or validity.get("primary_category") or "Insufficient Information"
@@ -235,6 +246,8 @@ def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
         "ml_probability": raw_result.get("ml_probability", 0.0),
         "final_ai_decision": final_decision,
         "contributing_features": raw_result.get("contributing_features", []),
+        "score_breakdown": raw_result.get("score_breakdown"),
+        "override_rule_applied": raw_result.get("override_rule_applied"),
         "human_classification": None,
         "human_sif_score": None,
         "reviewer_feedback": None,
@@ -278,12 +291,18 @@ def analyze_safety_observation(
         checklist_items = [f.strip() for f in re.split(r'[,;]\s*', factors_text) if f.strip()]
 
     # Backend validation rule:
-    # VALID if: description != empty OR checklist_items.length > 0
+    # Mutual exclusivity: both checklist and description is not allowed!
+    if text and len(checklist_items) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Dual submission not allowed: Please provide either a detailed description OR select checklist factors, but not both."
+        )
+
     # INVALID only if: description is empty AND checklist_items is empty
     if not text and len(checklist_items) == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Please provide at least one safety observation or select at least one checklist factor."
+            detail="Please provide either a detailed description OR select at least one checklist factor."
         )
 
     # Multi-Stage Step 1: Safety Observation Validity Layer

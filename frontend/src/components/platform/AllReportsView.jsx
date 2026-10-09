@@ -240,11 +240,11 @@ export default function AllReportsView({ onNavigate }) {
                   {report.sif_precursor_assessment === 'YES' ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
-                      SIF Precursor ({report.ai_score || 94}%)
+                      SIF Precursor (Risk Score: {report.ai_score || 85}/100)
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Routine Observation ({report.ai_score || 35}%)
+                      Routine Observation (Risk Score: {report.ai_score || 25}/100)
                     </span>
                   )}
                 </div>
