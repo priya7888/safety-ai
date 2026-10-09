@@ -43,6 +43,7 @@ import FullAnalysisModal from './FullAnalysisModal';
 import IncidentLocationModal from './maps/IncidentLocationModal';
 import IncidentPostAnalysisMap from './maps/IncidentPostAnalysisMap';
 import AdminNavigationModal from './maps/AdminNavigationModal';
+import { useAuth } from '../../context/AuthContext';
 import { 
   addReportRecord, 
   addWeakSignalToBoard, 
@@ -914,6 +915,14 @@ export function detectCategoryFromChecklist(selectedLabels) {
 }
 
 export default function AIAnalysisView() {
+  const { user } = useAuth();
+  const isAdmin = Boolean(
+    user?.is_admin || 
+    user?.role === 'ADMINISTRATOR' || 
+    user?.role_name === 'Administrator' || 
+    (user?.email && user.email.toLowerCase().includes('admin'))
+  );
+
   const [reportType, setReportType] = useState('NEAR_MISS');
   const [inputMode, setInputMode] = useState('DESCRIPTION'); // 'DESCRIPTION' | 'CHECKLIST' (mutually exclusive)
   const [checklistCategoryFilter, setChecklistCategoryFilter] = useState('ALL');
@@ -2085,8 +2094,8 @@ export default function AIAnalysisView() {
                     }
                     incidentType={analysisResult.classification || reportType}
                     reportName={analysisResult.report_name}
-                    onNavigate={() => setShowAdminNavModal(true)}
-                    isAdmin={true}
+                    onNavigate={isAdmin ? () => setShowAdminNavModal(true) : undefined}
+                    isAdmin={isAdmin}
                   />
 
                   {/* Section 2: Detected Hazards & Energy Vectors */}

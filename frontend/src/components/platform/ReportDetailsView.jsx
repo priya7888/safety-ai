@@ -25,8 +25,16 @@ import {
 import { api } from '../../services/api';
 import IncidentPostAnalysisMap from './maps/IncidentPostAnalysisMap';
 import AdminNavigationModal from './maps/AdminNavigationModal';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ReportDetailsView({ reportId, onBack }) {
+  const { user } = useAuth();
+  const isAdmin = Boolean(
+    user?.is_admin || 
+    user?.role === 'ADMINISTRATOR' || 
+    user?.role_name === 'Administrator' || 
+    (user?.email && user.email.toLowerCase().includes('admin'))
+  );
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -268,8 +276,8 @@ export default function ReportDetailsView({ reportId, onBack }) {
             riskLevel={riskLevel}
             incidentType={report.report_type?.replace('_', ' ') || 'Incident'}
             reportName={report.report_reference}
-            onNavigate={() => setShowAdminNavModal(true)}
-            isAdmin={true}
+            onNavigate={isAdmin ? () => setShowAdminNavModal(true) : undefined}
+            isAdmin={isAdmin}
           />
         </div>
 

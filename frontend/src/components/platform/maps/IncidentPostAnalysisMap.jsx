@@ -21,7 +21,7 @@ export default function IncidentPostAnalysisMap({
   incidentType = 'Near Miss',
   reportName = 'Safety Observation',
   onNavigate,
-  isAdmin = true
+  isAdmin = false
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -208,7 +208,8 @@ export default function IncidentPostAnalysisMap({
           </div>
         </div>
 
-        {onNavigate && (
+        {/* Navigation Button: Strictly for Administrators only */}
+        {isAdmin && onNavigate ? (
           <button
             type="button"
             onClick={onNavigate}
@@ -218,7 +219,12 @@ export default function IncidentPostAnalysisMap({
             <span>Navigate to Incident Location</span>
             <ArrowRight className="w-4 h-4 ml-0.5" />
           </button>
-        )}
+        ) : !isAdmin ? (
+          <div className="text-[11px] font-mono text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 font-bold shadow-2xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Observation Location Tagged</span>
+          </div>
+        ) : null}
       </div>
 
     </div>
