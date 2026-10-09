@@ -213,7 +213,7 @@ export default function AdminNavigationModal({
     : `https://www.google.com/maps/search/?api=1&query=${incLat},${incLng}`;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl border-2 border-stone-200 shadow-2xl max-w-4xl w-full h-[92vh] max-h-[840px] flex flex-col overflow-hidden text-slate-800">
         
         {/* Top Header */}

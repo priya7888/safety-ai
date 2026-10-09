@@ -112,6 +112,9 @@ export default function IncidentPostAnalysisMap({
     setTimeout(() => {
       map.invalidateSize();
     }, 200);
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500);
 
     return () => {
       map.remove();

@@ -25,6 +25,8 @@ import {
   updateReportDetails 
 } from '../../services/safetyStore';
 import { useAuth } from '../../context/AuthContext';
+import IncidentPostAnalysisMap from './maps/IncidentPostAnalysisMap';
+import AdminNavigationModal from './maps/AdminNavigationModal';
 
 export default function FullAnalysisModal({ report, onClose }) {
   if (!report) return null;
@@ -65,6 +67,7 @@ export default function FullAnalysisModal({ report, onClose }) {
   const [editableAction, setEditableAction] = useState(storeRecord.recommended_action || report.recommended_action || report.immediateAction || 'Immediate physical barrier enforcement and audit.');
   const [hasEdits, setHasEdits] = useState(false);
   const [saveToast, setSaveToast] = useState(null);
+  const [showAdminNavModal, setShowAdminNavModal] = useState(false);
 
   useEffect(() => {
     setCurrentStatus(storeRecord.status || 'Under Review');
@@ -120,6 +123,34 @@ export default function FullAnalysisModal({ report, onClose }) {
   const unitName = report.facility_unit || report.exactLocation || report.site || report.unit || report.location || 'Unit 1 Active Operations';
   const reportType = report.report_type || report.type || 'Field Observation';
   const reportLocation = report.location || report.site || 'Operating Facility';
+
+  const riskScore = report.ai_sif_score ?? report.sif_score ?? report.risk_score ?? analysis.risk_score ?? (isSIF ? 88 : 28);
+  const riskLevel = riskScore > 66 ? 'High Risk' : riskScore >= 33 ? 'Medium Risk' : 'Low Risk';
+
+  const incidentLocation = useMemo(() => {
+    let lat = report.incident_latitude ?? storeRecord?.incident_latitude ?? report.latitude ?? report.lat;
+    let lng = report.incident_longitude ?? storeRecord?.incident_longitude ?? report.longitude ?? report.lng;
+
+    const name = report.incident_location_name || storeRecord?.incident_location_name || report.location || report.exactLocation || unitName || 'Operating Unit Site';
+    const address = report.incident_address || storeRecord?.incident_address || `${name} Operational Area`;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+      if (String(unitName).toLowerCase().includes('sivaraopeta') || String(name).toLowerCase().includes('sivaraopeta') || String(reportLocation).toLowerCase().includes('sivaraopeta')) {
+        lat = 17.0005;
+        lng = 81.8040;
+      } else {
+        lat = 12.9716;
+        lng = 77.5946;
+      }
+    }
+
+    return {
+      latitude: Number(lat),
+      longitude: Number(lng),
+      name,
+      address
+    };
+  }, [report, storeRecord, unitName, reportLocation]);
 
   const isWeakSignal = Boolean(
     report.isWeakSignal ||
@@ -288,10 +319,11 @@ export default function FullAnalysisModal({ report, onClose }) {
   }, [report, storeRecord, reportRef, unitName, explanation, hazard]);
 
   return (
-    <div 
-      onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200 select-none"
-    >
+    <>
+      <div 
+        onClick={onClose}
+        className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200 select-none"
+      >
       
       {/* Modal Dialog */}
       <div 
@@ -518,6 +550,30 @@ export default function FullAnalysisModal({ report, onClose }) {
             </div>
           </div>
 
+          {/* ================= INCIDENT LOCATION & GEOGRAPHIC RECORD ================= */}
+          {/* Visible to BOTH Admin and User. Navigation action restricted strictly to Admin. */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 font-heading">
+                <MapPin className="w-4 h-4 text-[#FF5A36]" />
+                Incident Site &amp; Geospatial Positioning
+              </span>
+              <span className="text-[10px] font-mono font-bold text-slate-500 bg-[#FAF8F5] px-2 py-0.5 rounded border border-[#EAE6E1]">
+                {isAdmin ? 'Admin View: Full Navigation Enabled' : 'User View: Verified Location Display'}
+              </span>
+            </div>
+
+            <IncidentPostAnalysisMap
+              incidentLocation={incidentLocation}
+              riskScore={riskScore}
+              riskLevel={riskLevel}
+              incidentType={report.report_type || 'Safety Observation'}
+              reportName={reportRef}
+              onNavigate={isAdmin ? () => setShowAdminNavModal(true) : undefined}
+              isAdmin={isAdmin}
+            />
+          </div>
+
           {/* ================= REVIEW STATUS & LIVE GOVERNANCE AT END ================= */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#F8FAFC] border-2 border-slate-200 space-y-4 shadow-2xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
@@ -733,5 +789,18 @@ export default function FullAnalysisModal({ report, onClose }) {
       </div>
 
     </div>
+
+    {/* Live Admin Turn-by-Turn GPS Navigation Modal: Strictly for Administrators */}
+    {isAdmin && showAdminNavModal && (
+      <AdminNavigationModal
+        isOpen={showAdminNavModal}
+        onClose={() => setShowAdminNavModal(false)}
+        incidentLocation={incidentLocation}
+        riskScore={riskScore}
+        riskLevel={riskLevel}
+        incidentType={report.report_type || 'Safety Observation'}
+      />
+    )}
+  </>
   );
 }
