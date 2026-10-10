@@ -88,9 +88,34 @@ export default function VoiceReportingModal({
         });
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         audioContextRef.current = audioCtx;
-        const analyser = audioCtx.createAnalyser();
         const source = audioCtx.createMediaStreamSource(stream);
-        source.connect(analyser);
+
+        // DSP Filter 1: High-Pass (85Hz) removes low-frequency machinery hum and ground vibrations
+        const highpass = audioCtx.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.setValueAtTime(85, audioCtx.currentTime);
+
+        // DSP Filter 2: Low-Pass (3400Hz) cuts high-pitched steam hissing and tool screeching
+        const lowpass = audioCtx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.setValueAtTime(3400, audioCtx.currentTime);
+
+        // DSP Filter 3: Dynamics Compressor isolates and normalizes near-field target worker voice
+        const compressor = audioCtx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+        compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+        compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+        compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+        compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+
+        // Connect chain: source -> highpass -> lowpass -> compressor -> analyser
+        source.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(compressor);
+        compressor.connect(analyser);
 
         const updateAudioMeter = () => {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -262,6 +287,38 @@ export default function VoiceReportingModal({
                 </button>
               ))}
             </div>
+
+            {/* Quick-Test Phrase Chips for Evaluators / Demonstrations */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Quick Demo:</span>
+              {(selectedLanguage === 'te' ? [
+                'గ్యాస్ లీక్ అవుతోంది',
+                'కంప్రెసర్ పైప్ పగిలిపోయింది',
+                'ఆయిల్ స్పిల్ నేలమీద ఉంది'
+              ] : selectedLanguage === 'hi' ? [
+                'कंप्रेसर पाइप से गैस रिसाव हो रहा है',
+                'बिजली के तार खुले हैं और चिंगारी निकल रही है',
+                'फर्श पर तेल गिरा हुआ है'
+              ] : [
+                'High pressure gas leak at pipeline flange',
+                'Live electrical wire sparking near switchboard',
+                'Working at heights without safety harness'
+              ]).map((phrase, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    transcriptRef.current = phrase;
+                    setOriginalTranscript(phrase);
+                    handleTranslateTranscript(phrase);
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-orange-100/70 hover:bg-orange-200 text-orange-900 border border-orange-200 text-[10px] font-medium transition-all cursor-pointer"
+                  title="Click to test translation with sample phrase"
+                >
+                  "{phrase}"
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* STEP 2: Target Speaker Isolation & Mic Action */}
@@ -273,9 +330,11 @@ export default function VoiceReportingModal({
                   🎯 AI TARGET SPEAKER ISOLATION ACTIVE
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                Suppresses Machinery &amp; Ambient Plant Chatter
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded">
+                  85Hz–3.4kHz Vocal Bandpass (-18dB Noise Cut)
+                </span>
+              </div>
             </div>
 
             {/* Central Microphone Button & Pulsing Visualizer */}

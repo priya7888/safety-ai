@@ -62,21 +62,32 @@ TRANSLATION_DICTIONARY = {
     # HINDI SCRIPT
     "गैस रिसाव": "pressurized gas leakage",
     "गैस लीक": "flammable gas leakage",
+    "गैस लीकेज": "flammable gas leakage",
     "पाइपलाइन": "pipeline",
+    "पाइप से": "from the pipeline",
+    "फ्लैंज": "flange joint",
     "आग लग गई": "fire outbreak with open flames",
+    "आग की लपटें": "active fire flames",
+    "जल रहा है": "burning fire",
     "चिंगारी": "hot welding sparks",
     "धुआं": "dense toxic smoke",
+    "धुआं उठ रहा है": "dense smoke rising",
     "बिजली का झटका": "electrical shock hazard",
     "खुले तार": "exposed live electrical conductors",
+    "करंट आ रहा है": "live electrical current leakage",
     "तेल का रिसाव": "crude oil spill on floor",
+    "तेल बिखरा हुआ है": "crude oil pooled across floor",
     "फर्श पर फिसलन": "slippery floor surface causing fall hazard",
     "ऊंचाई पर काम": "working at elevated height without fall arrest protection",
     "सेफ्टी बेल्ट": "safety harness",
+    "बिना हार्नेस": "working without safety harness",
     "हेलमेट": "safety helmet hardhat",
+    "बिना हेलमेट": "without mandatory hardhat PPE",
     "वाल्व": "isolation valve",
     "कंप्रेसर": "compressor bay",
     "धमाका": "explosion blast hazard",
     "शॉर्ट सर्किट": "electrical short circuit and arcing",
+    "अलार्म बज रहा है": "hazard alarm sounding",
     "खतरा": "critical hazard",
 
     # HINDI TRANSLITERATED (HINGLISH)
@@ -91,7 +102,22 @@ TRANSLATION_DICTIONARY = {
     "valve se leak": "pressurized pipeline valve flange leaking flammable hydrocarbon",
     "helmet nahi lagaya": "worker on site without mandatory hardhat PPE",
     "cylinder leak ho raha hai": "pressurized LPG cylinder valve leaking flammable vapor",
-    "short circuit hua hai": "electrical switchboard short circuit with arcing"
+    "short circuit hua hai": "electrical switchboard short circuit with arcing",
+
+    # GRAMMATICAL CONNECTORS & PREPOSITIONS (HINDI & TELUGU)
+    " aur ": " and ",
+    " tatha ": " and ",
+    " se ": " from ",
+    " mein ": " in ",
+    " par ": " on ",
+    " ke paas ": " near ",
+    " ke upar ": " above ",
+    " ke karan ": " due to ",
+    " nundi ": " from ",
+    " meedha ": " on ",
+    " daggara ": " near ",
+    " valla ": " due to ",
+    " lekunda ": " without "
 }
 
 # Ambient Background Noise & Cross-Talk Filter Patterns
