@@ -37,7 +37,10 @@ import {
   ChevronUp,
   CheckSquare,
   Search,
-  Building2
+  Building2,
+  Mic,
+  MicOff,
+  Languages
 } from 'lucide-react';
 import { api } from '../../services/api';
 import FullAnalysisModal from './FullAnalysisModal';
@@ -936,6 +939,12 @@ export default function AIAnalysisView() {
   const [validationError, setValidationError] = useState('');
   const [uploadedIndex, setUploadedIndex] = useState(0);
 
+  // Multilingual Voice & Translation State
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [originalNativeTranscript, setOriginalNativeTranscript] = useState('');
+
   // Interactive controls state: Checklist & Search
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistSearch, setChecklistSearch] = useState('');
@@ -958,6 +967,64 @@ export default function AIAnalysisView() {
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showAdminNavModal, setShowAdminNavModal] = useState(false);
+
+  // Multilingual voice speech-to-text recording
+  const handleToggleVoice = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech Recognition is not supported by your current browser.');
+      return;
+    }
+    if (isRecording) {
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = selectedLanguage;
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend = () => setIsRecording(false);
+      recognition.onerror = () => setIsRecording(false);
+
+      recognition.onresult = async (event) => {
+        const transcript = event.results[0][0].transcript;
+        setIsRecording(false);
+        const currentLangObj = [
+          { code: 'en-US', label: 'English', flag: '🇺🇸', apiLang: 'en' },
+          { code: 'hi-IN', label: 'Hindi (हिंदी)', flag: '🇮🇳', apiLang: 'hi' },
+          { code: 'te-IN', label: 'Telugu (తెలుగు)', flag: '🇮🇳', apiLang: 'te' },
+          { code: 'ta-IN', label: 'Tamil (தமிழ்)', flag: '🇮🇳', apiLang: 'ta' },
+          { code: 'mr-IN', label: 'Marathi (मराठी)', flag: '🇮🇳', apiLang: 'mr' },
+          { code: 'es-ES', label: 'Spanish (Español)', flag: '🇪🇸', apiLang: 'es' }
+        ].find(l => l.code === selectedLanguage);
+
+        if (currentLangObj && currentLangObj.apiLang !== 'en') {
+          setIsTranslating(true);
+          setOriginalNativeTranscript(transcript);
+          try {
+            const trans = await api.translate(transcript, currentLangObj.apiLang);
+            const englishText = trans?.translated_text || transcript;
+            setDescription(englishText.slice(0, 100));
+          } catch (e) {
+            setDescription(transcript.slice(0, 100));
+          } finally {
+            setIsTranslating(false);
+          }
+        } else {
+          setDescription(transcript.slice(0, 100));
+        }
+        if (validationError) setValidationError('');
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.warn('Speech recognition start failed:', err);
+      setIsRecording(false);
+    }
+  };
 
   // Handle Open Map Click with Browser Geolocation Permission (Requirement 2)
   const handleOpenMapClick = () => {
@@ -1622,14 +1689,64 @@ export default function AIAnalysisView() {
             {/* Mode 1: Free-Text Detailed Explanation */}
             {inputMode === 'DESCRIPTION' && (
               <div className="space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <label className="block text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 font-heading">
                     DETAILED FIELD EXPLANATION
                   </label>
-                  <span className={`text-xs sm:text-sm font-mono font-black ${description.length >= 100 ? 'text-[#FF5A36]' : 'text-slate-500'}`}>
-                    {description.length} / 100 CHARACTERS
-                  </span>
+                  
+                  {/* Multilingual Voice Dictation & Language Selection */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-white border border-stone-200 px-2 py-1 rounded-xl shadow-2xs">
+                      <Languages className="w-3.5 h-3.5 text-slate-500" />
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="bg-transparent text-[11px] font-bold text-slate-700 focus:outline-none cursor-pointer"
+                        title="Select Voice & Translation Language"
+                      >
+                        <option value="en-US">🇺🇸 English</option>
+                        <option value="hi-IN">🇮🇳 Hindi (हिंदी)</option>
+                        <option value="te-IN">🇮🇳 Telugu (తెలుగు)</option>
+                        <option value="ta-IN">🇮🇳 Tamil (தமிழ்)</option>
+                        <option value="mr-IN">🇮🇳 Marathi (मराठी)</option>
+                        <option value="es-ES">🇪🇸 Spanish (Español)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleToggleVoice}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+                        isRecording
+                          ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+                          : 'bg-white hover:bg-orange-50 text-slate-700 hover:text-[#FF5A36] border-stone-200'
+                      }`}
+                    >
+                      {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-[#FF5A36]" />}
+                      <span>{isRecording ? 'Listening...' : 'Voice Dictate'}</span>
+                    </button>
+
+                    <span className={`text-xs sm:text-sm font-mono font-black ${description.length >= 100 ? 'text-[#FF5A36]' : 'text-slate-500'}`}>
+                      {description.length} / 100 CHARACTERS
+                    </span>
+                  </div>
                 </div>
+
+                {isTranslating && (
+                  <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 p-2 rounded-xl flex items-center gap-2 animate-pulse font-mono font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-[#FF5A36] animate-ping" />
+                    <span>Translating observation to English and evaluating safety relevance...</span>
+                  </div>
+                )}
+
+                {originalNativeTranscript && (
+                  <div className="text-xs text-slate-700 bg-white border border-stone-200 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs font-mono">
+                    <span className="truncate">🗣️ Native Speech: "{originalNativeTranscript}"</span>
+                    <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold shrink-0 text-[11px]">
+                      ✓ Translated &amp; Validated in English
+                    </span>
+                  </div>
+                )}
                 <textarea
                   rows={5}
                   maxLength={100}

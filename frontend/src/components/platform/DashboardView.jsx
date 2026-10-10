@@ -599,6 +599,64 @@ export default function DashboardView({ onNavigate }) {
         </div>
       </section>
 
+      {/* ================= 1.2 PLATFORM MISSION & SIF INTELLIGENCE OVERVIEW ================= */}
+      <section className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-white via-[#FAF8F5] to-orange-50/40 border-2 border-stone-200/90 shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2 border-b border-stone-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-300 flex items-center justify-center text-[#FF5A36] font-bold shadow-2xs">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight font-heading">
+                Safety AI — Industrial Safety Intelligence Platform
+              </h3>
+              <p className="text-[11px] font-mono font-semibold text-slate-500">
+                Serious Injury &amp; Fatality (SIF) Precursor Identification &amp; Weak-Signal Correlation
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ● Live Multi-Stage Engine
+            </span>
+          </div>
+        </div>
+
+        <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-medium">
+          <strong>Safety AI</strong> is an AI-powered industrial Safety Intelligence Platform designed to identify potential <strong>Serious Injury and Fatality (SIF)</strong> precursors from unsafe-act, unsafe-condition, and near-miss reports. It enables workers to submit reports through voice or text in supported languages, translates and validates the report in English, and processes it using Natural Language Processing, machine learning, and safety rules. Its key innovation is <strong>weak-signal correlation</strong>, which identifies combinations of warning signs that may indicate more serious hazards. The platform provides explainable risk assessments, prioritizes reports for human review, and helps safety teams identify recurring patterns and take preventive action earlier.
+        </p>
+
+        {/* 5 Capability Highlights */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1 text-[11px] font-mono">
+          <div className="p-2 rounded-xl bg-white border border-stone-200 shadow-2xs">
+            <span className="text-base block mb-0.5">🎙️</span>
+            <strong className="text-slate-800 block font-bold">Multilingual Voice</strong>
+            <span className="text-slate-500 text-[10px]">Speech-to-text in native languages</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-stone-200 shadow-2xs">
+            <span className="text-base block mb-0.5">🌐</span>
+            <strong className="text-slate-800 block font-bold">Auto-Translation</strong>
+            <span className="text-slate-500 text-[10px]">Translates &amp; validates in English</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-stone-200 shadow-2xs">
+            <span className="text-base block mb-0.5">🧠</span>
+            <strong className="text-slate-800 block font-bold">NLP &amp; Safety ML</strong>
+            <span className="text-slate-500 text-[10px]">High-energy vector &amp; barrier logic</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-stone-200 shadow-2xs">
+            <span className="text-base block mb-0.5">⚡</span>
+            <strong className="text-slate-800 block font-bold">Weak-Signal Sync</strong>
+            <span className="text-slate-500 text-[10px]">Latent hazard pattern detection</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-stone-200 shadow-2xs col-span-2 sm:col-span-1">
+            <span className="text-base block mb-0.5">📊</span>
+            <strong className="text-slate-800 block font-bold">Explainable Risk</strong>
+            <span className="text-slate-500 text-[10px]">Human prioritization &amp; actions</span>
+          </div>
+        </div>
+      </section>
+
       {/* ================= 1.5 KEY OPERATIONAL METRICS (4 KPIS) ================= */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Safety Reports */}

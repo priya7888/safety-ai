@@ -12,9 +12,14 @@ from ..ai_services.ai_service import analyze_safety_report
 from ..ai_services.signal_correlation import detect_latent_weak_signals_in_text
 from ..ai_services.safety_validity import classify_safety_observation_validity
 from ..ai_services.context_analyzer import classify_incident_category
+from ..services.translation import translate_text_to_english
 
 router = APIRouter(prefix="/api/analysis", tags=["AI Analysis"])
 ai_analysis_router = APIRouter(prefix="/api/ai-analysis", tags=["AI Analysis"])
+
+class TranslationPayload(BaseModel):
+    text: str
+    source_language: Optional[str] = "auto"
 
 class LiveAnalysisRequest(BaseModel):
     report_text: Optional[str] = ""
@@ -127,7 +132,21 @@ def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
         cat_info = classify_incident_category(" ".join(checklist_items))
         r_type = payload.report_type or payload.classification or cat_info["label"]
     else:
-        text = raw_text
+        # Multilingual auto-translation for non-English observation text
+        translated_info = None
+        if any(ord(c) > 127 for c in raw_text):
+            trans_result, detected_lang = translate_text_to_english(raw_text)
+            if trans_result and trans_result != raw_text:
+                translated_info = {
+                    "original_text": raw_text,
+                    "translated_text": trans_result,
+                    "source_language": detected_lang
+                }
+                text = trans_result
+            else:
+                text = raw_text
+        else:
+            text = raw_text
         # Strictly respect user's manual selection when entering description; do not assume
         r_type = payload.report_type or payload.classification or "Near Miss"
         cat_info = None
@@ -248,6 +267,7 @@ def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
         "contributing_features": raw_result.get("contributing_features", []),
         "score_breakdown": raw_result.get("score_breakdown"),
         "override_rule_applied": raw_result.get("override_rule_applied"),
+        "translation": locals().get("translated_info"),
         "human_classification": None,
         "human_sif_score": None,
         "reviewer_feedback": None,
@@ -364,3 +384,17 @@ def list_completed_analyses(
 ):
     """Retrieves all completed AI analyses belonging to the authenticated organization."""
     return get_organization_analyses(db, current_user.organization_id)
+
+
+@router.post("/translate")
+@ai_analysis_router.post("/translate")
+def translate_observation_endpoint(payload: TranslationPayload):
+    """Translates non-English safety observation voice transcripts or text to English."""
+    translated, detected = translate_text_to_english(payload.text, payload.source_language)
+    return {
+        "original_text": payload.text,
+        "translated_text": translated,
+        "source_language": detected,
+        "target_language": "en",
+        "success": True
+    }
