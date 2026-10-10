@@ -13,7 +13,24 @@ from typing import Dict, Any, Optional
 
 # Industrial Safety Multilingual Vocabulary & Phrasal Lexicon
 TRANSLATION_DICTIONARY = {
-    # TELUGU SCRIPT
+    # TELUGU ACTIONS, VERBS & CONDITIONS
+    "పగిలిపోయింది": "burst ruptured broken",
+    "పగిలింది": "ruptured burst",
+    "విరిగిపోయింది": "broken damaged",
+    "ఊడిపోయింది": "detached disconnected loose",
+    "కాలుతోంది": "burning on fire",
+    "మండిపోతోంది": "catching fire igniting",
+    "పడింది": "fell down",
+    "జారిపడ్డాడు": "slipped and fell",
+    "షాక్ తగిలింది": "suffered electric shock",
+    "లీకవుతోంది": "is leaking",
+    "లీక్ అవుతుంది": "is leaking",
+    "లీక్ అవుతోంది": "is leaking",
+    "వాసన వస్తోంది": "odor gas releasing",
+    "సరిగ్గా లేదు": "is defective damaged",
+    "పనిచేయడం లేదు": "is malfunctioning not working",
+    "కంప్రెసర్ పైప్ పగిలిపోయింది": "compressor pipe burst and ruptured",
+    "పైప్ పగిలిపోయింది": "pipe ruptured and burst",
     "గ్యాస్ లీక్": "gas leakage",
     "గ్యాస్ లీకేజీ": "gas leakage",
     "పైప్‌లైన్": "pipeline",
@@ -45,6 +62,8 @@ TRANSLATION_DICTIONARY = {
     "నియంత్రణ లేదు": "safety barrier absent or compromised",
 
     # TELUGU TRANSLITERATED (TENGLISH)
+    "pagilipoyindi": "burst ruptured broken",
+    "pagilindi": "ruptured",
     "gas leak avtundi": "high pressure gas leakage detected",
     "gas vasthundi": "flammable gas odor releasing",
     "mantalu vachayi": "fire outbreak flames ignited",
@@ -58,6 +77,20 @@ TRANSLATION_DICTIONARY = {
     "compressor sound ekkuva": "abnormal heavy compressor vibration and casing noise",
     "tank lopalaki": "unauthorized confined space tank entry without breathing apparatus",
     "smoke vasthundi": "thick electrical smoke emanating from control panel",
+
+    # HINDI ACTIONS & CONDITIONS
+    "फट गया": "burst ruptured",
+    "टूट गया": "broken cracked damaged",
+    "अलग हो गया": "detached disconnected",
+    "जल गया": "burned caught fire",
+    "गिर गया": "fell down",
+    "फिसल गया": "slipped and fell",
+    "झटका लगा": "suffered electric shock",
+    "लीक हो रहा है": "is leaking",
+    "खराब है": "is defective broken",
+    "काम नहीं कर रहा": "is malfunctioning not working",
+    "कंप्रेसर पाइप फट गया": "compressor pipe burst and ruptured",
+    "पाइप फट गया": "pipe burst and ruptured",
 
     # HINDI SCRIPT
     "गैस रिसाव": "pressurized gas leakage",
@@ -91,6 +124,8 @@ TRANSLATION_DICTIONARY = {
     "खतरा": "critical hazard",
 
     # HINDI TRANSLITERATED (HINGLISH)
+    "fat gaya": "burst ruptured",
+    "toot gaya": "broken damaged",
     "gas leak ho raha hai": "pressurized gas leakage occurring from pipe joint",
     "aag lag gayi": "fire outbreak erupted with active flames",
     "chingari nikal rahi hai": "hot sparks discharging near combustible materials",
@@ -150,10 +185,10 @@ def detect_source_language(text: str) -> str:
     
     t_lower = text.lower()
     # Check Tenglish cues
-    if any(k in t_lower for k in ["avtundi", "vasthundi", "chudu", "pettukoledu", "meedha", "lekunda", "vachayi"]):
+    if any(k in t_lower for k in ["avtundi", "vasthundi", "chudu", "pettukoledu", "meedha", "lekunda", "vachayi", "pagilipoyindi"]):
         return "te-Latn"
     # Check Hinglish cues
-    if any(k in t_lower for k in ["ho raha hai", "lag gayi", "nikal rahi", "khule hain", "pehna", "hua hai"]):
+    if any(k in t_lower for k in ["ho raha hai", "lag gayi", "nikal rahi", "khule hain", "pehna", "hua hai", "fat gaya"]):
         return "hi-Latn"
     
     return "en"
@@ -189,25 +224,47 @@ def translate_to_safety_english(text: str, source_lang: Optional[str] = None) ->
         }
 
     translated = ""
-    # Attempt high-accuracy translation
-    langpair = "te|en" if (detected_lang.startswith("te") or re.search(r"[\u0c00-\u0c7f]", isolated_text)) else "hi|en"
+    sl_code = "te" if (detected_lang.startswith("te") or re.search(r"[\u0c00-\u0c7f]", isolated_text)) else "hi" if (detected_lang.startswith("hi") or re.search(r"[\u0900-\u097f]", isolated_text)) else "auto"
+
+    # Tier 1: High-Speed Direct Google Machine Translation
     try:
         import urllib.request, urllib.parse, json
         q = urllib.parse.quote(isolated_text)
+        gtx_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl_code}&tl=en&dt=t&q={q}"
         req = urllib.request.Request(
-            f"https://api.mymemory.translated.net/get?q={q}&langpair={langpair}",
-            headers={"User-Agent": "SafetyAI/1.0"}
+            gtx_url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         )
-        with urllib.request.urlopen(req, timeout=3.0) as res:
+        with urllib.request.urlopen(req, timeout=3.5) as res:
             if res.status == 200:
-                data = json.loads(res.read().decode("utf-8"))
-                candidate = data.get("responseData", {}).get("translatedText", "")
-                if candidate and not candidate.startswith("MYMEMORY WARNING") and candidate.lower() != isolated_text.lower():
-                    translated = candidate
+                raw_json = json.loads(res.read().decode("utf-8"))
+                if raw_json and isinstance(raw_json, list) and len(raw_json) > 0 and isinstance(raw_json[0], list):
+                    joined_parts = "".join([part[0] for part in raw_json[0] if part and len(part) > 0 and part[0]])
+                    if joined_parts and joined_parts.strip() and joined_parts.lower() != isolated_text.lower():
+                        translated = joined_parts.strip()
     except Exception:
         pass
 
-    # If translation was empty or offline, use dictionary substitutions
+    # Tier 2: MyMemory Translation API fallback
+    if not translated:
+        langpair = f"{sl_code}|en"
+        try:
+            import urllib.request, urllib.parse, json
+            q = urllib.parse.quote(isolated_text)
+            req = urllib.request.Request(
+                f"https://api.mymemory.translated.net/get?q={q}&langpair={langpair}",
+                headers={"User-Agent": "SafetyAI/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=3.0) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode("utf-8"))
+                    candidate = data.get("responseData", {}).get("translatedText", "")
+                    if candidate and not candidate.startswith("MYMEMORY WARNING") and candidate.lower() != isolated_text.lower():
+                        translated = candidate
+        except Exception:
+            pass
+
+    # Tier 3: Industrial Safety Domain Lexicon Dictionary fallback
     if not translated:
         translated = isolated_text
         applied_matches = 0

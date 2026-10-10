@@ -345,6 +345,11 @@ function isUnrelatedIssue(text, checklist = []) {
     return false;
   }
   if (!text) return true;
+  // If the observation is written in Telugu, Hindi, or contains Indic scripts,
+  // it is an authentic regional safety report and must not be flagged as unrelated
+  if (/[\u0c00-\u0c7f\u0900-\u097f]/.test(text)) {
+    return false;
+  }
   const cleaned = text.trim().toLowerCase();
   if (cleaned.length === 0) return true;
   if (cleaned.length < 4) return true;
@@ -1064,6 +1069,21 @@ export default function AIAnalysisView() {
     setAutoSavedInfo(null);
     setAnalysisStep('Phase 1/4: Ingesting uploaded report telemetry & parsing energy vectors...');
 
+    let processedText = text;
+    // Auto-translate multilingual (Telugu/Hindi) text to English before SIF analysis
+    if (processedText && /[\u0c00-\u0c7f\u0900-\u097f]/.test(processedText)) {
+      setAnalysisStep('Phase 1/4: Translating Telugu/Hindi safety observation to English...');
+      try {
+        const trans = await api.translateVoiceText(processedText);
+        if (trans && trans.translated_text && trans.translated_text.trim()) {
+          processedText = trans.translated_text.trim();
+          setDescription(processedText);
+        }
+      } catch (err) {
+        console.warn('Frontend translation fallback to backend auto-translation:', err);
+      }
+    }
+
     setTimeout(() => {
       setAnalysisStep('Phase 2/4: Screening IOGP Life-Saving Rules & barrier failure states...');
     }, 250);
@@ -1076,8 +1096,8 @@ export default function AIAnalysisView() {
       setAnalysisStep('Phase 4/4: Computing neural risk score & SIF precursor determination...');
     }, 750);
 
-    const isUnrelated = isUnrelatedIssue(text, currentChecklist);
-    const reportName = deriveReportName(text, rType, loc, currentChecklist);
+    const isUnrelated = isUnrelatedIssue(processedText, currentChecklist);
+    const reportName = deriveReportName(processedText, rType, loc, currentChecklist);
 
     // UNRELATED / TRIVIAL INPUT INTERCEPT: Prompt user to enter a correct safety issue
     if (isUnrelated) {
@@ -1100,7 +1120,7 @@ export default function AIAnalysisView() {
           energy_source: 'None Identified',
           barrier_status: 'Not Applicable (Unrelated Input)',
           iogp_rule: 'Not Applicable',
-          explainable_reasoning: `The input "${text}" is not recognized as a related operational safety issue. Please enter a correct safety issue describing equipment, location, barrier conditions, or hazardous energy vectors.`,
+          explainable_reasoning: `The input "${processedText}" is not recognized as a related operational safety issue. Please enter a correct safety issue describing equipment, location, barrier conditions, or hazardous energy vectors.`,
           recommended_controls: [
             'Enter a correct safety issue describing equipment, location, and conditions',
             'Include specific hazard parameters (e.g. pressure, voltage, chemical, elevation)',
@@ -1119,8 +1139,8 @@ export default function AIAnalysisView() {
     // Execute canonical backend AI analysis
     try {
       const backendResult = await api.executeAiAnalysis({
-        report_text: text,
-        description: text,
+        report_text: processedText,
+        description: processedText,
         report_name: reportName,
         report_type: rType === 'NEAR_MISS' ? 'Near Miss' : rType === 'UNSAFE_ACT' ? 'Unsafe Act' : 'Unsafe Condition',
         classification: rType === 'NEAR_MISS' ? 'Near Miss' : rType === 'UNSAFE_ACT' ? 'Unsafe Act' : 'Unsafe Condition',

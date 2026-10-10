@@ -133,6 +133,13 @@ def handle_live_analysis(payload: LiveAnalysisRequest) -> Dict[str, Any]:
         r_type = payload.report_type or payload.classification or "Near Miss"
         cat_info = None
 
+    # Step 0: Auto-translate multilingual text (Telugu/Hindi/Transliterated) to standard English
+    if text and (re.search(r"[\u0c00-\u0c7f\u0900-\u097f]", text) or any(k in text.lower() for k in ["avtundi", "vasthundi", "ho raha hai", "lag gayi", "nikal rahi", "pagilipoyindi", "fat gaya"])):
+        trans_res = translate_to_safety_english(text)
+        if trans_res.get("translated_text"):
+            text = trans_res["translated_text"]
+            payload.report_text = text
+
     # Multi-Stage Step 1: Safety Observation Validity Layer
     validity = classify_safety_observation_validity(text)
 
@@ -305,6 +312,15 @@ def analyze_safety_observation(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Please provide either a detailed description OR select at least one checklist factor."
         )
+
+    # Step 0: Auto-translate multilingual text (Telugu/Hindi/Transliterated) to standard English
+    if text and (re.search(r"[\u0c00-\u0c7f\u0900-\u097f]", text) or any(k in text.lower() for k in ["avtundi", "vasthundi", "ho raha hai", "lag gayi", "nikal rahi", "pagilipoyindi", "fat gaya"])):
+        trans_res = translate_to_safety_english(text)
+        if trans_res.get("translated_text"):
+            text = trans_res["translated_text"]
+            payload.report_text = text
+            if hasattr(payload, "description") and payload.description:
+                payload.description = text
 
     # Multi-Stage Step 1: Safety Observation Validity Layer
     validity_input = f"{text} {payload.additional_context or ''}".strip()
