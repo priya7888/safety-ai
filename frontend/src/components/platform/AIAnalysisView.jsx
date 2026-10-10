@@ -1680,6 +1680,34 @@ export default function AIAnalysisView() {
                   className="w-full p-4 rounded-xl bg-[#FAF8F5] border-2 border-stone-200 text-sm sm:text-base font-semibold text-slate-900 leading-relaxed focus:outline-none focus:bg-white focus:border-[#FF5A36] focus:ring-4 focus:ring-[#FF5A36]/10 placeholder:text-slate-400 placeholder:font-normal transition-all"
                   placeholder="Describe safety incident in detail..."
                 />
+
+                {/* Live Indic Detection & Instant Translation Chip */}
+                {description && /[\u0c00-\u0c7f\u0900-\u097f]/.test(description) && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-orange-50/90 border border-orange-200 text-xs text-orange-950 font-medium animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span>
+                        <strong className="font-bold">{/[\u0c00-\u0c7f]/.test(description) ? 'Telugu (తెలుగు)' : 'Hindi (हिंदी)'}</strong> safety report detected &mdash; Automatically translated to English during AI analysis.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await api.translateVoiceText(description);
+                          if (res?.translated_text) {
+                            setDescription(res.translated_text);
+                          }
+                        } catch (e) {}
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-mono font-bold text-[11px] transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1.5"
+                    >
+                      <span>Translate to English Now</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
                 <p className="text-[11px] font-mono text-slate-400 italic">
                   * Note: Classification (Near Miss, Unsafe Act, or Unsafe Condition) is selected manually above. Checklists are locked in Explanation Mode.
                 </p>
