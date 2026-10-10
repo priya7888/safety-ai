@@ -294,12 +294,9 @@ export default function AboutSection({ onExplore }) {
               "
             >
               <strong className="text-slate-900 font-semibold">
-                SafetyAI
+                Safety AI
               </strong>{' '}
-              is an AI-powered Safety Intelligence Platform that transforms
-              industrial safety reports into actionable insights. It identifies
-              potential risks and early warning signals before they develop
-              into serious incidents.
+              is an AI-powered industrial Safety Intelligence Platform designed to identify potential Serious Injury and Fatality (SIF) precursors from unsafe-act, unsafe-condition, and near-miss reports. It enables workers to submit reports through voice or text in supported languages, translates and validates the report in English, and processes it using Natural Language Processing, machine learning, and safety rules. Its key innovation is weak-signal correlation, which identifies combinations of warning signs that may indicate more serious hazards. The platform provides explainable risk assessments, prioritizes reports for human review, and helps safety teams identify recurring patterns and take preventive action earlier.
             </p>
 
             {/* ================= CONTINUOUS ANALYSIS ================= */}

@@ -18,8 +18,8 @@ export default function AboutPage({ onNavigate, onOpenLogin, onOpenDemo }) {
               Actionable Intelligence
             </span>
           </h1>
-          <p className="max-w-3xl mx-auto text-base sm:text-xl text-slate-300 font-light leading-relaxed">
-            SafetyAI is an AI-powered Safety Intelligence Platform that transforms industrial safety reports into actionable insights, detecting early warning signals before incidents happen.
+          <p className="max-w-4xl mx-auto text-base sm:text-lg text-slate-300 font-light leading-relaxed">
+            Safety AI is an AI-powered industrial Safety Intelligence Platform designed to identify potential Serious Injury and Fatality (SIF) precursors from unsafe-act, unsafe-condition, and near-miss reports. It enables workers to submit reports through voice or text in supported languages, translates and validates the report in English, and processes it using Natural Language Processing, machine learning, and safety rules. Its key innovation is weak-signal correlation, which identifies combinations of warning signs that may indicate more serious hazards. The platform provides explainable risk assessments, prioritizes reports for human review, and helps safety teams identify recurring patterns and take preventive action earlier.
           </p>
         </div>
       </section>

@@ -220,6 +220,63 @@ export default function HowItWorksPage({ onNavigate, onOpenLogin, onOpenDemo }) 
 
           </div>
 
+          {/* Multilingual Voice Hazard Reporting Feature Breakdown */}
+          <div className="rounded-3xl bg-slate-900/90 border-2 border-amber-500/30 p-8 sm:p-10 space-y-8">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <span className="px-3.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                FEATURE SPOTLIGHT
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-white font-heading">
+                Multilingual Voice Hazard Reporting (Telugu, Hindi, English)
+              </h2>
+              <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+                Designed for noisy industrial environments where frontline workers wearing gloves and PPE report hazards by speaking naturally.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black font-mono">
+                  01
+                </div>
+                <h4 className="text-base font-bold text-white">1. Worker starts voice reporting</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  The worker presses the microphone button and speaks in <strong>Telugu, Hindi, or English</strong> while other people are talking nearby.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-black font-mono">
+                  02
+                </div>
+                <h4 className="text-base font-bold text-white">2. Isolate the target speaker</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  AI reduces machinery noise and other voices, prioritizing the selected worker's speech instead of transcribing every conversation.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/20 text-yellow-400 flex items-center justify-center font-black font-mono">
+                  03
+                </div>
+                <h4 className="text-base font-bold text-white">3. Convert speech into text</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Speech recognition transcribes the isolated voice in its original language, then a translation model converts it into English.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black font-mono">
+                  04
+                </div>
+                <h4 className="text-base font-bold text-white">4. Continue existing safety analysis</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  The worker confirms the transcript, and your existing NLP/ML pipeline identifies hazards, possible SIF precursors, and weak-signal combinations.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </section>

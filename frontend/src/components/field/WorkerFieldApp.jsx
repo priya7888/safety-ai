@@ -37,6 +37,7 @@ import {
   getStoredTotalRecords,
   getStoreState
 } from '../../services/safetyStore';
+import VoiceReportingModal from '../common/VoiceReportingModal';
 
 // Common field safety factors for 1-tap checklist reporting
 const QUICK_SAFETY_FACTORS = [
@@ -48,15 +49,6 @@ const QUICK_SAFETY_FACTORS = [
   { id: 'chemical', label: 'Chemical / Liquid Spill', icon: '🧪', hazard: 'Corrosive Fluid / Hydrocarbon Spill', category: 'Hazardous Materials' },
   { id: 'barrier', label: 'Barrier / LOTO Bypass', icon: '🛑', hazard: 'Missing Safety Barrier / Lock Bypass', category: 'Energy Isolation' },
   { id: 'ppe', label: 'PPE Non-Compliance', icon: '🧤', hazard: 'Missing Helmet / Face Shield / Harness', category: 'PPE Violation' }
-];
-
-export const SUPPORTED_LANGUAGES = [
-  { code: 'en-US', label: 'English', flag: '🇺🇸', apiLang: 'en' },
-  { code: 'hi-IN', label: 'Hindi (हिंदी)', flag: '🇮🇳', apiLang: 'hi' },
-  { code: 'te-IN', label: 'Telugu (తెలుగు)', flag: '🇮🇳', apiLang: 'te' },
-  { code: 'ta-IN', label: 'Tamil (தமிழ்)', flag: '🇮🇳', apiLang: 'ta' },
-  { code: 'mr-IN', label: 'Marathi (मराठी)', flag: '🇮🇳', apiLang: 'mr' },
-  { code: 'es-ES', label: 'Spanish (Español)', flag: '🇪🇸', apiLang: 'es' }
 ];
 
 // Presets for quick field worker switcher (from our 40-worker allocation across 4 admins)
@@ -132,9 +124,7 @@ export default function WorkerFieldApp({ onNavigate, onExitToWeb }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
-  const [originalTranscript, setOriginalTranscript] = useState('');
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   // SOS Emergency State
   const [sosActive, setSosActive] = useState(false);
@@ -204,33 +194,17 @@ export default function WorkerFieldApp({ onNavigate, onExitToWeb }) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = selectedLanguage;
+      recognition.lang = 'en-US';
 
       recognition.onstart = () => setIsRecording(true);
       recognition.onend = () => setIsRecording(false);
       recognition.onerror = () => setIsRecording(false);
 
-      recognition.onresult = async (event) => {
+      recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
+        setReportText(prev => prev ? `${prev} ${transcript}` : transcript);
         setReportMode('description');
         setIsRecording(false);
-
-        const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === selectedLanguage);
-        if (currentLangObj && currentLangObj.apiLang !== 'en') {
-          setIsTranslating(true);
-          setOriginalTranscript(transcript);
-          try {
-            const trans = await api.translate(transcript, currentLangObj.apiLang);
-            const englishText = trans?.translated_text || transcript;
-            setReportText(prev => prev ? `${prev} ${englishText}` : englishText);
-          } catch (e) {
-            setReportText(prev => prev ? `${prev} ${transcript}` : transcript);
-          } finally {
-            setIsTranslating(false);
-          }
-        } else {
-          setReportText(prev => prev ? `${prev} ${transcript}` : transcript);
-        }
       };
 
       recognition.start();
@@ -705,61 +679,27 @@ export default function WorkerFieldApp({ onNavigate, onExitToWeb }) {
 
               {/* MODE 2 / COMPLEMENTARY: STATEMENT & VOICE */}
               <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     {reportMode === 'checklist' ? 'Additional Field Notes (Optional):' : 'Incident Statement / Description:'}
                   </label>
                   
-                  <div className="flex items-center gap-1.5">
-                    {/* Language Selector */}
-                    <select
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="bg-slate-800 text-[10px] text-slate-200 font-bold px-2 py-1 rounded-xl border border-slate-700 focus:outline-none cursor-pointer"
-                      title="Select Voice & Translation Language"
-                    >
-                      {SUPPORTED_LANGUAGES.map((lang) => (
-                        <option key={lang.code} value={lang.code}>
-                          {lang.flag} {lang.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Voice Dictation Button */}
-                    <button
-                      type="button"
-                      onClick={handleToggleVoice}
-                      className={`px-2.5 py-1 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isRecording 
-                          ? 'bg-rose-600 text-white animate-pulse' 
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {isRecording ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3 text-amber-400" />}
-                      <span>{isRecording ? 'Listening...' : 'Voice Dictate'}</span>
-                    </button>
-                  </div>
+                  {/* Voice Dictation Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowVoiceModal(true)}
+                    className="px-2.5 py-1 rounded-xl text-[10.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-slate-800 text-amber-400 hover:bg-slate-700 border border-slate-700 shadow-sm"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Voice Report (Telugu/Hindi/En)</span>
+                  </button>
                 </div>
-
-                {isTranslating && (
-                  <div className="text-[10px] text-amber-400 font-mono flex items-center gap-1.5 bg-amber-950/40 p-1.5 rounded-xl border border-amber-800/40 animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                    <span>Translating observation to English...</span>
-                  </div>
-                )}
-
-                {originalTranscript && (
-                  <div className="text-[10px] text-amber-300 font-mono bg-amber-950/40 border border-amber-800/50 p-2 rounded-xl flex items-center justify-between gap-2">
-                    <span className="truncate">🗣️ Native Input: "{originalTranscript}"</span>
-                    <span className="text-emerald-400 font-bold shrink-0">✓ Validated in English</span>
-                  </div>
-                )}
 
                 <textarea
                   rows={reportMode === 'checklist' ? 2 : 4}
                   value={reportText}
                   onChange={(e) => setReportText(e.target.value)}
-                  placeholder={reportMode === 'checklist' ? 'e.g. Near compressor unit 2, no barriers placed...' : 'Describe what happened, equipment involved, and immediate hazard observed (or speak in Hindi, Telugu, Tamil, etc.)...'}
+                  placeholder={reportMode === 'checklist' ? 'e.g. Near compressor unit 2, no barriers placed...' : 'Describe what happened, equipment involved, and immediate hazard observed...'}
                   className="w-full p-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 leading-relaxed resize-none font-medium"
                 />
               </div>
@@ -955,6 +895,16 @@ export default function WorkerFieldApp({ onNavigate, onExitToWeb }) {
         </div>
 
       </div>
+
+      {/* Target Speaker Isolated Multilingual Voice Reporting Modal */}
+      <VoiceReportingModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onConfirmTranscript={(translatedText) => {
+          setReportText(translatedText);
+          setReportMode('description');
+        }}
+      />
 
     </div>
   );
