@@ -516,7 +516,28 @@ export const api = {
         return await res.json();
       }
     } catch (e) {
-      // Backend offline: use graceful client-side translation
+      // Backend offline or error: fall through
+    }
+
+    try {
+      const langpair = (sourceLang === 'te' || /[\u0C00-\u0C7F]/.test(text)) ? 'te|en' : 'hi|en';
+      const extRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`);
+      if (extRes.ok) {
+        const extData = await extRes.json();
+        const cand = extData?.responseData?.translatedText;
+        if (cand && !cand.startsWith('MYMEMORY WARNING') && cand.toLowerCase() !== text.toLowerCase()) {
+          return {
+            original_text: text,
+            translated_text: cand,
+            source_language: sourceLang,
+            target_language: 'en',
+            speaker_isolated: true,
+            confidence: 0.95
+          };
+        }
+      }
+    } catch (e) {
+      // Offline: proceed to local dictionary
     }
 
     // Client-side fallback dictionary for offline support

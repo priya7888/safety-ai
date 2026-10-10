@@ -34,6 +34,7 @@ export default function VoiceReportingModal({
   const [stepStatus, setStepStatus] = useState(1); // 1: Ready, 2: Isolating & Listening, 3: Transcribed & Translated, 4: Confirmed
   const [audioLevel, setAudioLevel] = useState(30);
 
+  const transcriptRef = useRef('');
   const recognitionRef = useRef(null);
   const audioContextRef = useRef(null);
   const animFrameRef = useRef(null);
@@ -69,6 +70,7 @@ export default function VoiceReportingModal({
       return;
     }
 
+    transcriptRef.current = '';
     setOriginalTranscript('');
     setTranslatedTranscript('');
     setIsListening(true);
@@ -112,18 +114,15 @@ export default function VoiceReportingModal({
       recognition.interimResults = true;
       recognition.lang = currentLangConfig.bcp47;
 
-      recognition.onresult = async (event) => {
-        let finalTrans = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTrans += event.results[i][0].transcript;
-          } else {
-            finalTrans += event.results[i][0].transcript;
-          }
+      recognition.onresult = (event) => {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
         }
 
-        if (finalTrans) {
-          setOriginalTranscript(finalTrans);
+        if (fullTranscript) {
+          transcriptRef.current = fullTranscript;
+          setOriginalTranscript(fullTranscript);
         }
       };
 
@@ -132,12 +131,14 @@ export default function VoiceReportingModal({
         setIsListening(false);
       };
 
-      recognition.onend = async () => {
+      recognition.onend = () => {
         setIsListening(false);
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
 
-        // When speech ends, trigger translation step
-        handleTranslateTranscript();
+        const captured = transcriptRef.current.trim();
+        if (captured) {
+          handleTranslateTranscript(captured);
+        }
       };
 
       recognition.start();
@@ -155,8 +156,8 @@ export default function VoiceReportingModal({
   };
 
   // Step 3: Convert speech into English text
-  const handleTranslateTranscript = async () => {
-    const textToTranslate = originalTranscript.trim();
+  const handleTranslateTranscript = async (overrideText) => {
+    const textToTranslate = (typeof overrideText === 'string' ? overrideText : (transcriptRef.current || originalTranscript)).trim();
     if (!textToTranslate) return;
 
     setIsProcessing(true);
@@ -333,26 +334,47 @@ export default function VoiceReportingModal({
               <div>
                 <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-orange-900 flex items-center justify-between mb-1">
                   <span>SPOKEN TRANSCRIPT ({currentLangConfig.label}):</span>
-                  {selectedLanguage !== 'en' && (
-                    <span className="text-[10px] text-slate-500 font-normal">Original worker speech</span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleTranslateTranscript(originalTranscript)}
+                    disabled={isProcessing || !originalTranscript}
+                    className="text-[11px] font-bold text-orange-700 hover:text-orange-950 underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isProcessing ? 'animate-spin' : ''}`} />
+                    <span>{isProcessing ? 'Translating to English...' : 'Translate to English →'}</span>
+                  </button>
                 </div>
-                <div className="p-3 rounded-xl bg-white border border-orange-200 text-xs text-slate-800 leading-relaxed font-medium">
-                  {originalTranscript || 'Waiting for speech...'}
-                </div>
+                <textarea
+                  rows={2}
+                  value={originalTranscript}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    setOriginalTranscript(text);
+                    transcriptRef.current = text;
+                  }}
+                  className="w-full p-3 rounded-xl bg-white border border-orange-200 text-xs text-slate-800 leading-relaxed font-medium focus:ring-2 focus:ring-orange-400 focus:outline-none"
+                  placeholder={currentLangConfig.placeholder}
+                />
               </div>
 
               {/* English Translated Output */}
               <div>
-                <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>ISOLATED &amp; TRANSLATED ENGLISH STATEMENT:</span>
+                <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-900 flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>ISOLATED &amp; TRANSLATED ENGLISH STATEMENT:</span>
+                  </span>
+                  {isProcessing && (
+                    <span className="text-[10px] font-mono text-emerald-600 animate-pulse font-bold">
+                      Translating...
+                    </span>
+                  )}
                 </div>
                 <textarea
                   rows={3}
-                  value={translatedTranscript || originalTranscript}
+                  value={translatedTranscript || (isProcessing ? 'Converting to English...' : '')}
                   onChange={(e) => setTranslatedTranscript(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white border border-emerald-300 text-xs text-slate-900 leading-relaxed font-medium focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-white border border-emerald-300 text-xs text-slate-900 leading-relaxed font-semibold focus:ring-2 focus:ring-emerald-400 focus:outline-none"
                   placeholder="Translated English safety statement..."
                 />
               </div>

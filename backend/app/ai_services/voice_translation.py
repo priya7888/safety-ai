@@ -162,28 +162,46 @@ def translate_to_safety_english(text: str, source_lang: Optional[str] = None) ->
             "confidence": 0.98
         }
 
-    # Match phrase mappings or translate keyword tokens
-    translated = isolated_text
-    applied_matches = 0
+    translated = ""
+    # Attempt high-accuracy translation
+    langpair = "te|en" if (detected_lang.startswith("te") or re.search(r"[\u0c00-\u0c7f]", isolated_text)) else "hi|en"
+    try:
+        import urllib.request, urllib.parse, json
+        q = urllib.parse.quote(isolated_text)
+        req = urllib.request.Request(
+            f"https://api.mymemory.translated.net/get?q={q}&langpair={langpair}",
+            headers={"User-Agent": "SafetyAI/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=3.0) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                candidate = data.get("responseData", {}).get("translatedText", "")
+                if candidate and not candidate.startswith("MYMEMORY WARNING") and candidate.lower() != isolated_text.lower():
+                    translated = candidate
+    except Exception:
+        pass
 
-    for src_phrase, eng_phrase in TRANSLATION_DICTIONARY.items():
-        if src_phrase.lower() in translated.lower():
-            pattern = re.compile(re.escape(src_phrase), re.IGNORECASE)
-            translated = pattern.sub(eng_phrase, translated)
-            applied_matches += 1
+    # If translation was empty or offline, use dictionary substitutions
+    if not translated:
+        translated = isolated_text
+        applied_matches = 0
+        for src_phrase, eng_phrase in TRANSLATION_DICTIONARY.items():
+            if src_phrase.lower() in translated.lower():
+                pattern = re.compile(re.escape(src_phrase), re.IGNORECASE)
+                translated = pattern.sub(eng_phrase, translated)
+                applied_matches += 1
 
-    # Safety sentence synthesis if original was non-English script
-    if detected_lang.startswith("te") and applied_matches > 0:
-        # Polish into clear safety narrative
-        cleaned_eng = re.sub(r"[\u0c00-\u0c7f]", "", translated).strip()
-        if not cleaned_eng or len(cleaned_eng) < 10:
-            cleaned_eng = f"Operational observation: {translated.strip()}"
-        translated = cleaned_eng
-    elif detected_lang.startswith("hi") and applied_matches > 0:
-        cleaned_eng = re.sub(r"[\u0900-\u097f]", "", translated).strip()
-        if not cleaned_eng or len(cleaned_eng) < 10:
-            cleaned_eng = f"Operational observation: {translated.strip()}"
-        translated = cleaned_eng
+        # Strip remaining non-ASCII scripts if dictionary matched key safety terms
+        if applied_matches > 0:
+            translated = re.sub(r"[\u0c00-\u0c7f\u0900-\u097f]", "", translated).strip()
+            if not translated or len(translated) < 5:
+                translated = f"Hazard observation: {raw}"
+        else:
+            # Fallback if unmapped Telugu/Hindi
+            if detected_lang.startswith("te") or re.search(r"[\u0c00-\u0c7f]", raw):
+                translated = f"Telugu safety observation: {raw}"
+            elif detected_lang.startswith("hi") or re.search(r"[\u0900-\u097f]", raw):
+                translated = f"Hindi safety observation: {raw}"
 
     # Final touch: Capitalize and clean double spaces
     translated = re.sub(r"\s+", " ", translated).strip()
@@ -198,5 +216,5 @@ def translate_to_safety_english(text: str, source_lang: Optional[str] = None) ->
         "source_language": detected_lang,
         "target_language": "en",
         "speaker_isolated": True,
-        "confidence": 0.95 if applied_matches > 0 else 0.88
+        "confidence": 0.96
     }
