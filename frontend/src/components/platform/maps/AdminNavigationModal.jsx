@@ -48,8 +48,8 @@ export default function AdminNavigationModal({
 
   const incLat = incidentLocation.latitude;
   const incLng = incidentLocation.longitude;
-  const incName = incidentLocation.name || 'Crude Distillation Unit (CDU)';
-  const incAddress = incidentLocation.address || `${incName} Process Area`;
+  const incName = incidentLocation.name || 'Unit 1';
+  const incAddress = incidentLocation.address || incidentLocation.name || 'Unit 1';
 
   // Step 1: Obtain Admin's Current Location via browser Geolocation API
   useEffect(() => {
@@ -150,11 +150,8 @@ export default function AdminNavigationModal({
       incMarker.bindPopup(`
         <div style="font-family: sans-serif; font-size: 12px; padding: 4px;">
           <strong style="color: #EF4444; font-size: 13px;">📍 Incident Destination</strong>
-          <div style="margin-top: 4px; font-weight: 700; color: #0f172a;">${incName}</div>
+          <div style="margin-top: 4px; font-weight: 700; color: #0f172a;">${incAddress || incName}</div>
           <div style="font-size: 11px; color: #475569; margin-top: 2px;">${incidentType} &bull; Score: ${riskScore}</div>
-          <div style="font-family: monospace; font-size: 10px; color: #64748b; margin-top: 2px;">
-            ${incLat.toFixed(6)}, ${incLng.toFixed(6)}
-          </div>
         </div>
       `);
 
@@ -263,11 +260,6 @@ export default function AdminNavigationModal({
                 <div className="text-xs font-bold text-slate-900 truncate">
                   {adminLocation ? 'Admin Device / Dispatch Point' : 'Acquiring GPS...'}
                 </div>
-                {adminLocation && (
-                  <div className="text-[10px] font-mono text-blue-700">
-                    {adminLocation.latitude.toFixed(4)}, {adminLocation.longitude.toFixed(4)}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -290,10 +282,7 @@ export default function AdminNavigationModal({
                   DESTINATION (INCIDENT SITE)
                 </div>
                 <div className="text-xs font-bold text-slate-900 truncate">
-                  {incName}
-                </div>
-                <div className="text-[10px] font-mono text-rose-700">
-                  {incLat.toFixed(4)}, {incLng.toFixed(4)}
+                  {incAddress || incName}
                 </div>
               </div>
             </div>

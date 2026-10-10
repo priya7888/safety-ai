@@ -131,8 +131,8 @@ export default function FullAnalysisModal({ report, onClose }) {
     let lat = report.incident_latitude ?? storeRecord?.incident_latitude ?? report.latitude ?? report.lat;
     let lng = report.incident_longitude ?? storeRecord?.incident_longitude ?? report.longitude ?? report.lng;
 
-    const name = report.incident_location_name || storeRecord?.incident_location_name || report.location || report.exactLocation || unitName || 'Operating Unit Site';
-    const address = report.incident_address || storeRecord?.incident_address || `${name} Operational Area`;
+    const name = report.incident_location_name || storeRecord?.incident_location_name || report.location || report.exactLocation || unitName || 'Unit 1';
+    const address = report.incident_address || storeRecord?.incident_address || name;
 
     if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
       if (String(unitName).toLowerCase().includes('sivaraopeta') || String(name).toLowerCase().includes('sivaraopeta') || String(reportLocation).toLowerCase().includes('sivaraopeta')) {

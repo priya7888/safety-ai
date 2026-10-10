@@ -26,27 +26,26 @@ export default function IncidentLocationModal({
   onClose,
   initialLocation,
   userLocation,
+  selectedUnit = 'Unit 1',
   onConfirm
 }) {
   if (!isOpen) return null;
 
-  // Initial map center defaults:
-  // 1. Existing confirmed incident location if available
-  // 2. Or user location if acquired via permission
-  // 3. Or default industrial refinery coordinates (Crude Distillation Unit: 12.9716, 77.5946)
+  const fallbackUnit = selectedUnit || 'Unit 1';
+
+  // Initial map center defaults
   const defaultCoords = initialLocation
     ? { lat: initialLocation.latitude, lng: initialLocation.longitude }
     : userLocation
     ? { lat: userLocation.latitude, lng: userLocation.longitude }
     : { lat: 12.9716, lng: 77.5946 };
 
+  const initialAddr = (initialLocation?.address && !initialLocation.address.toLowerCase().startsWith('coordinates'))
+    ? initialLocation.address
+    : (initialLocation?.name && !initialLocation.name.toLowerCase().includes('vicinity') ? initialLocation.name : fallbackUnit);
+
   const [currentCoords, setCurrentCoords] = useState(defaultCoords);
-  const [locationName, setLocationName] = useState(
-    initialLocation?.name || 'Crude Distillation Unit (CDU)'
-  );
-  const [locationAddress, setLocationAddress] = useState(
-    initialLocation?.address || 'Crude Distillation Unit (Operating Sector, Primary Refining)'
-  );
+  const [locationAddress, setLocationAddress] = useState(initialAddr);
   const [mapType, setMapType] = useState('street'); // 'street' or 'satellite'
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -97,10 +96,7 @@ export default function IncidentLocationModal({
     marker.bindPopup(`
       <div style="font-family: sans-serif; font-size: 12px; padding: 4px;">
         <strong style="color: #FF5A36; font-size: 13px;">📍 Incident Location</strong>
-        <div style="margin-top: 4px; font-weight: 600; color: #1e293b;">${locationName}</div>
-        <div style="font-family: monospace; font-size: 10px; color: #64748b; margin-top: 2px;">
-          ${currentCoords.lat.toFixed(6)}, ${currentCoords.lng.toFixed(6)}
-        </div>
+        <div style="margin-top: 4px; font-weight: 600; color: #1e293b;">${locationAddress || fallbackUnit}</div>
       </div>
     `);
 
@@ -163,28 +159,27 @@ export default function IncidentLocationModal({
   // Handle coordinate updates with reverse geocoding
   const handleCoordinatesChange = async (lat, lng) => {
     setIsReverseGeocoding(true);
-    setStatusNotice('Resolving location address & facility sector...');
+    setStatusNotice('Resolving location address...');
 
     try {
       const geo = await reverseGeocode(lat, lng);
-      setLocationName(geo.name);
-      setLocationAddress(geo.address);
-      setStatusNotice(`Pin positioned at: ${geo.name}`);
+      const cleanAddr = (geo.address && !geo.address.toLowerCase().startsWith('coordinates'))
+        ? geo.address
+        : (geo.name && !geo.name.toLowerCase().includes('vicinity') ? geo.name : fallbackUnit);
+
+      setLocationAddress(cleanAddr);
+      setStatusNotice(`Pin positioned: ${cleanAddr}`);
 
       if (markerRef.current) {
         markerRef.current.setPopupContent(`
           <div style="font-family: sans-serif; font-size: 12px; padding: 4px;">
             <strong style="color: #FF5A36; font-size: 13px;">📍 Incident Location</strong>
-            <div style="margin-top: 4px; font-weight: 600; color: #1e293b;">${geo.name}</div>
-            <div style="font-family: monospace; font-size: 10px; color: #64748b; margin-top: 2px;">
-              ${lat.toFixed(6)}, ${lng.toFixed(6)}
-            </div>
+            <div style="margin-top: 4px; font-weight: 600; color: #1e293b;">${cleanAddr}</div>
           </div>
         `);
       }
     } catch (e) {
-      setLocationName('Selected Plant Coordinates');
-      setLocationAddress(`Latitude ${lat.toFixed(6)}, Longitude ${lng.toFixed(6)}`);
+      setLocationAddress(fallbackUnit);
     } finally {
       setIsReverseGeocoding(false);
     }
@@ -347,11 +342,12 @@ export default function IncidentLocationModal({
 
   // Confirm Location Handler
   const handleConfirmLocation = () => {
+    const finalAddress = locationAddress || fallbackUnit;
     onConfirm({
       latitude: parseFloat(currentCoords.lat.toFixed(6)),
       longitude: parseFloat(currentCoords.lng.toFixed(6)),
-      address: locationAddress || `${locationName} Operating Area`,
-      name: locationName || 'Industrial Facility Point'
+      address: finalAddress,
+      name: finalAddress
     });
     onClose();
   };
@@ -451,23 +447,20 @@ export default function IncidentLocationModal({
         {/* Selected Location Details & Action Footer */}
         <div className="p-4 sm:p-5 bg-white border-t border-stone-200 space-y-3 shrink-0">
           <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-orange-800 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#FF5A36]" />
                 <span>CONFIRMING INCIDENT LOCATION (NOT USER LOCATION):</span>
               </div>
               <div className="text-sm sm:text-base font-black text-slate-900 leading-tight">
-                {locationName}
-              </div>
-              <div className="text-xs text-slate-600 font-medium truncate max-w-lg">
-                {locationAddress}
+                {locationAddress || fallbackUnit}
               </div>
             </div>
 
-            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-orange-200/60 shrink-0">
-              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">COORDINATES</span>
-              <span className="font-mono text-xs font-black text-[#FF5A36] bg-white px-2.5 py-1 rounded-lg border border-orange-200 shadow-2xs">
-                {currentCoords.lat.toFixed(6)}, {currentCoords.lng.toFixed(6)}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs font-bold font-mono text-orange-900 bg-white px-3 py-1.5 rounded-xl border border-orange-200 shadow-2xs flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-[#FF5A36]" />
+                <span>{fallbackUnit}</span>
               </span>
             </div>
           </div>

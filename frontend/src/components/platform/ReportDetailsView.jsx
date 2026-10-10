@@ -192,8 +192,8 @@ export default function ReportDetailsView({ reportId, onBack }) {
   const incidentLocation = {
     latitude: report.incident_latitude || 12.9716,
     longitude: report.incident_longitude || 77.5946,
-    name: report.incident_location_name || report.location || 'Industrial Unit',
-    address: report.incident_address || `${report.incident_location_name || report.location} Operating Area`
+    name: report.incident_location_name || report.location || 'Unit 1',
+    address: report.incident_address || report.incident_location_name || report.location || 'Unit 1'
   };
 
   return (

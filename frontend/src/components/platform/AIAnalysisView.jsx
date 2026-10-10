@@ -36,7 +36,8 @@ import {
   ChevronDown,
   ChevronUp,
   CheckSquare,
-  Search
+  Search,
+  Building2
 } from 'lucide-react';
 import { api } from '../../services/api';
 import FullAnalysisModal from './FullAnalysisModal';
@@ -1820,18 +1821,14 @@ export default function AIAnalysisView() {
                   Change Location
                 </button>
               </div>
-              <div className="text-sm font-black text-slate-900">
-                {selectedIncidentLocation.name || 'Industrial Facility Point'}
-              </div>
-              <div className="text-xs font-mono font-semibold text-slate-600 flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-white border border-orange-200 text-slate-800">
-                  📍 {selectedIncidentLocation.latitude.toFixed(4)}, {selectedIncidentLocation.longitude.toFixed(4)}
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-orange-200 font-bold text-xs text-orange-950 shadow-2xs shrink-0">
+                  <Building2 className="w-3.5 h-3.5 text-orange-600" />
+                  {location || selectedIncidentLocation.unit || 'Unit 1'}
                 </span>
-                {selectedIncidentLocation.address && selectedIncidentLocation.address !== selectedIncidentLocation.name && (
-                  <span className="truncate max-w-xs text-slate-500 font-sans text-[11px]">
-                    {selectedIncidentLocation.address}
-                  </span>
-                )}
+                <span className="text-sm font-black text-slate-900 truncate">
+                  {selectedIncidentLocation.address || selectedIncidentLocation.name || location || 'Unit 1'}
+                </span>
               </div>
             </div>
           )}
@@ -2084,8 +2081,8 @@ export default function AIAnalysisView() {
                     incidentLocation={analysisResult.incidentLocation || selectedIncidentLocation || {
                       latitude: analysisResult.incident_latitude || 12.9716,
                       longitude: analysisResult.incident_longitude || 77.5946,
-                      name: analysisResult.incident_location_name || analysisResult.location || 'Crude Distillation Unit',
-                      address: analysisResult.incident_address || `${analysisResult.incident_location_name || 'Industrial Facility'} Area`
+                      name: analysisResult.incident_location_name || analysisResult.location || location || 'Unit 1',
+                      address: analysisResult.incident_address || analysisResult.incident_location_name || analysisResult.location || location || 'Unit 1'
                     }}
                     riskScore={analysisResult.risk_score}
                     riskLevel={
@@ -2354,9 +2351,10 @@ export default function AIAnalysisView() {
         onClose={() => setShowMapModal(false)}
         initialLocation={selectedIncidentLocation}
         userLocation={userLocation}
+        selectedUnit={location}
         onConfirm={(loc) => {
           setSelectedIncidentLocation(loc);
-          if (loc.name) {
+          if (loc.name && ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4'].includes(loc.name)) {
             setLocation(loc.name);
           }
           if (validationError) {
@@ -2372,8 +2370,8 @@ export default function AIAnalysisView() {
         incidentLocation={analysisResult?.incidentLocation || selectedIncidentLocation || {
           latitude: analysisResult?.incident_latitude || 12.9716,
           longitude: analysisResult?.incident_longitude || 77.5946,
-          name: analysisResult?.incident_location_name || analysisResult?.location || 'Crude Distillation Unit',
-          address: analysisResult?.incident_address || 'Refinery Operating Sector'
+          name: analysisResult?.incident_location_name || analysisResult?.location || location || 'Unit 1',
+          address: analysisResult?.incident_address || analysisResult?.location || location || 'Unit 1'
         }}
         riskScore={analysisResult?.risk_score || 50}
         riskLevel={

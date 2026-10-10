@@ -31,8 +31,8 @@ export default function IncidentPostAnalysisMap({
 
   const lat = incidentLocation?.latitude || 12.9716;
   const lng = incidentLocation?.longitude || 77.5946;
-  const locationName = incidentLocation?.name || 'Crude Distillation Unit (CDU)';
-  const locationAddress = incidentLocation?.address || `${locationName} Operating Area`;
+  const locationName = incidentLocation?.name || 'Unit 1';
+  const locationAddress = incidentLocation?.address || incidentLocation?.name || 'Unit 1';
 
   // Determine risk presentation rules:
   // Risk Score < 33 -> Green (Low Risk)
@@ -98,11 +98,7 @@ export default function IncidentPostAnalysisMap({
         <div style="font-size: 12px; line-height: 1.6; color: #334155;">
           <div><strong style="color: #64748b; font-size: 11px; text-transform: uppercase;">Risk Level:</strong> <span style="font-weight: 800; color: ${hexColor};">${badgeText}</span></div>
           <div><strong style="color: #64748b; font-size: 11px; text-transform: uppercase;">Incident Type:</strong> <span style="font-weight: 700; color: #0f172a;">${incidentType}</span></div>
-          <div><strong style="color: #64748b; font-size: 11px; text-transform: uppercase;">Location:</strong> <span style="font-weight: 700; color: #0f172a;">${locationName}</span></div>
-          <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-family: monospace; font-size: 11px; color: #475569;">
-            Lat: ${lat.toFixed(6)}<br/>
-            Lng: ${lng.toFixed(6)}
-          </div>
+          <div><strong style="color: #64748b; font-size: 11px; text-transform: uppercase;">Location:</strong> <span style="font-weight: 700; color: #0f172a;">${locationAddress || locationName}</span></div>
         </div>
       </div>
     `;
@@ -204,10 +200,7 @@ export default function IncidentPostAnalysisMap({
         <div className="text-xs space-y-0.5">
           <div className="font-bold text-slate-900 flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hexColor }} />
-            <span>Target: {locationName}</span>
-          </div>
-          <div className="font-mono text-[11px] text-slate-500 truncate max-w-md">
-            📍 Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+            <span className="truncate max-w-md">Target: {locationAddress || locationName}</span>
           </div>
         </div>
 

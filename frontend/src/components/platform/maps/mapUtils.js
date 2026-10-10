@@ -344,8 +344,8 @@ export async function reverseGeocode(lat, lng) {
 
   // 3. Fallback
   return {
-    name: closestPreset ? `${closestPreset.name} Vicinity` : 'Refinery Operations Sector',
-    address: `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    name: '',
+    address: ''
   };
 }
 
