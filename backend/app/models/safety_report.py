@@ -38,6 +38,7 @@ class SafetyReport(Base):
     assigned_admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     analysis_status = Column(String(50), default="PENDING", nullable=False) # PENDING, PROCESSING, COMPLETED, FAILED
+    status = Column(String(50), default="Open", nullable=False) # Open, In Progress, Verification Pending, Closed
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -47,3 +48,4 @@ class SafetyReport(Base):
     ai_analysis = relationship("AIAnalysis", back_populates="safety_report", uselist=False, cascade="all, delete-orphan")
     feedbacks = relationship("Feedback", back_populates="safety_report", cascade="all, delete-orphan")
     weak_signals = relationship("WeakSignal", secondary="report_weak_signals", back_populates="safety_reports")
+    response_tasks = relationship("ResponseTask", back_populates="safety_report", cascade="all, delete-orphan")

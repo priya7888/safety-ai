@@ -581,6 +581,109 @@ export const api = {
       speaker_isolated: true,
       confidence: 0.94
     };
+  },
+
+  // -------------------------------------------------------------
+  // Response Team Tasks & Multi-Department Verification API
+  // -------------------------------------------------------------
+  getResponseTasks: async (department = null, status = null, reportId = null) => {
+    try {
+      const params = new URLSearchParams();
+      if (department && department !== 'ALL') params.append('department', department);
+      if (status && status !== 'ALL') params.append('status', status);
+      if (reportId) params.append('report_id', reportId);
+
+      const res = await fetch(`${API_BASE}/tasks?${params.toString()}`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API getResponseTasks fallback to store:', e);
+    }
+    return [];
+  },
+
+  getResponseTaskKPIs: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/tasks/summary/kpis`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API getResponseTaskKPIs fallback:', e);
+    }
+    return {
+      total_tasks: 0,
+      unassigned_or_awaiting_claim: 0,
+      in_progress: 0,
+      awaiting_verification: 0,
+      rework_requested: 0,
+      verified_and_closed: 0,
+      department_distribution: {}
+    };
+  },
+
+  getTaskRecommendation: async (reportId) => {
+    try {
+      const res = await fetch(`${API_BASE}/tasks/recommend/${reportId}`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('API getTaskRecommendation fallback:', e);
+    }
+    return [];
+  },
+
+  createResponseTask: async (taskData) => {
+    const res = await fetch(`${API_BASE}/tasks`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(taskData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create response task.');
+    }
+    return await res.json();
+  },
+
+  acceptResponseTask: async (taskId) => {
+    const res = await fetch(`${API_BASE}/tasks/${taskId}/accept`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to accept task.');
+    }
+    return await res.json();
+  },
+
+  submitTaskVerification: async (taskId, { work_notes, evidence_notes, evidence_file_url }) => {
+    const res = await fetch(`${API_BASE}/tasks/${taskId}/submit-verification`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ work_notes, evidence_notes, evidence_file_url })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to submit verification.');
+    }
+    return await res.json();
+  },
+
+  verifyResponseTask: async (taskId, { decision, rework_reason }) => {
+    const res = await fetch(`${API_BASE}/tasks/${taskId}/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision, rework_reason })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to verify task.');
+    }
+    return await res.json();
   }
 };
 

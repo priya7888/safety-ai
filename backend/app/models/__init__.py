@@ -6,6 +6,8 @@ from .feedback import Feedback, FeedbackStatusEnum
 from .sif_finding import SIFFinding
 from .weak_signal import WeakSignal, WeakSignalReview, report_weak_signals
 
+from .response_task import ResponseTask
+
 __all__ = [
     "Organization",
     "User",
@@ -20,5 +22,7 @@ __all__ = [
     "WeakSignal",
     "WeakSignalReview",
     "report_weak_signals",
+    "ResponseTask",
 ]
+
 

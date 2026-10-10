@@ -34,7 +34,8 @@ def ensure_database_schema():
                     ("incident_longitude", "FLOAT"),
                     ("incident_address", "VARCHAR(500)"),
                     ("incident_location_name", "VARCHAR(200)"),
-                    ("assigned_admin_id", "INTEGER")
+                    ("assigned_admin_id", "INTEGER"),
+                    ("status", "VARCHAR(50) DEFAULT 'Open'")
                 ]
                 for col_name, col_type in new_cols:
                     if col_name not in existing_cols:

@@ -5,6 +5,7 @@ from .models.user import User
 from .models.safety_report import SafetyReport
 from .models.ai_analysis import AIAnalysis
 from .models.feedback import Feedback
+from .models.response_task import ResponseTask
 from .ai_services.ai_service import analyze_safety_report
 from .routers.auth import ensure_initial_seed
 
@@ -26,6 +27,11 @@ def seed_sample_data():
         report_count = db.query(SafetyReport).count()
         if report_count == 0:
             seed_initial_incidents(db)
+
+        # 4. If no response tasks exist, seed realistic response team tasks
+        task_count = db.query(ResponseTask).count()
+        if task_count == 0:
+            seed_initial_tasks(db)
     finally:
         db.close()
 
@@ -263,5 +269,133 @@ def seed_initial_incidents(db: Session):
         )
         db.add(analysis)
         db.commit()
+
+
+def seed_initial_tasks(db: Session):
+    """
+    Seeds realistic response tasks demonstrating the multi-department workflow:
+    - Multi-team coordination (Mechanical + HSE linked under one incident)
+    - Atomic exclusive acceptance
+    - Work submission for verification with evidence
+    - Admin verification & sign-off
+    - Admin rework request with clear instructions
+    """
+    from datetime import datetime
+    reports = db.query(SafetyReport).limit(6).all()
+    if not reports:
+        return
+
+    admins = db.query(User).filter(User.role == "ADMINISTRATOR").all()
+    workers = db.query(User).filter(User.role == "NORMAL_USER").all()
+    admin1 = admins[0] if admins else None
+    worker1 = workers[0] if workers else None
+    worker2 = workers[1] if len(workers) > 1 else None
+
+    # Incident 1: Multi-department coordinated tasks (Mechanical + HSE)
+    r1 = reports[0]
+    t1 = ResponseTask(
+        task_reference=f"TSK-{r1.report_reference}-MEC1",
+        report_id=r1.id,
+        organization_id=r1.organization_id,
+        department="Mechanical Maintenance",
+        title="Torque bolts & replace 280-bar high-pressure relief valve bypass",
+        description="Hydrotest high-pressure mud manifold, inspect mechanical flange integrity, and restore primary relief valve seal.",
+        priority="P1 - Critical",
+        status="ACCEPTED",
+        assigned_by_id=admin1.id if admin1 else None,
+        assigned_team_name="Mechanical Maintenance Rig Crew",
+        accepted_by_user_id=worker1.id if worker1 else None,
+        accepted_at=datetime.utcnow(),
+        due_date="2026-10-12"
+    )
+    t2 = ResponseTask(
+        task_reference=f"TSK-{r1.report_reference}-HSE2",
+        report_id=r1.id,
+        organization_id=r1.organization_id,
+        department="HSE & Safety Investigation",
+        title="Root-cause permit-to-work audit on bypassed pressure tags",
+        description="Interview shift drillers, review isolation logbook, and verify LSR-01 Energy Isolation checklist enforcement.",
+        priority="P1 - Critical",
+        status="SUBMITTED_FOR_VERIFICATION",
+        assigned_by_id=admin1.id if admin1 else None,
+        assigned_team_name="HSE Special Investigation Unit",
+        accepted_by_user_id=worker2.id if worker2 else None,
+        accepted_at=datetime.utcnow(),
+        work_notes="Conducted shift crew interview and verified bypass tag was removed during night shift filter change without supervisor sign-off. Remedial isolation log updated.",
+        evidence_notes="Uploaded scanned copy of PTW-2026-092 with revised supervisor sign-off protocol and tagged photo of valve.",
+        evidence_file_url="https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80",
+        submitted_for_verification_at=datetime.utcnow(),
+        due_date="2026-10-11"
+    )
+    db.add_all([t1, t2])
+
+    if len(reports) > 1:
+        r2 = reports[1]
+        t3 = ResponseTask(
+            task_reference=f"TSK-{r2.report_reference}-INS1",
+            report_id=r2.id,
+            organization_id=r2.organization_id,
+            department="Instrumentation & Control",
+            title="Install fixed LEL & H2S optical gas sensors with audible alarm",
+            description="Mount certified ATEX-rated infrared combustible gas detector at mud cellar pit and verify 20% LEL alarm interlock to SCADA.",
+            priority="P2 - High",
+            status="ASSIGNED",
+            assigned_by_id=admin1.id if admin1 else None,
+            assigned_team_name="Instrumentation & Control Team",
+            due_date="2026-10-14"
+        )
+        db.add(t3)
+
+    if len(reports) > 2:
+        r3 = reports[2]
+        t4 = ResponseTask(
+            task_reference=f"TSK-{r3.report_reference}-ELE1",
+            report_id=r3.id,
+            organization_id=r3.organization_id,
+            department="Electrical Maintenance",
+            title="Lockout/Tagout 415V MCC panel busbar and replace heat-damaged cables",
+            description="Perform thermal imaging thermography scan on MCC-02, de-energize feeder, and terminate certified fire-resistant cables.",
+            priority="P1 - Critical",
+            status="VERIFIED",
+            assigned_by_id=admin1.id if admin1 else None,
+            assigned_team_name="Electrical Maintenance Division",
+            accepted_by_user_id=worker1.id if worker1 else None,
+            accepted_at=datetime.utcnow(),
+            work_notes="Feeder MCC-02 de-energized under LOTO #EL-402. Replaced 3x185 sq mm scorched power cable and torqued lugs to 45 Nm.",
+            evidence_notes="Megger test reports: phase-to-phase > 500 MOhm. Post-repair infrared thermal scan shows nominal 32 deg C across busbar.",
+            evidence_file_url="https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=800&q=80",
+            submitted_for_verification_at=datetime.utcnow(),
+            verified_by_user_id=admin1.id if admin1 else None,
+            verified_at=datetime.utcnow(),
+            due_date="2026-10-10"
+        )
+        db.add(t4)
+
+    if len(reports) > 3:
+        r4 = reports[3]
+        t5 = ResponseTask(
+            task_reference=f"TSK-{r4.report_reference}-FIR1",
+            report_id=r4.id,
+            organization_id=r4.organization_id,
+            department="Fire & Rescue",
+            title="Install heavy-duty spark containment barrier and stage 50kg DCP trolley",
+            description="Deploy certified welding spark screens around pipe fabrication zone and test pressurized fire water hydrant hose reel.",
+            priority="P2 - High",
+            status="REWORK_REQUESTED",
+            assigned_by_id=admin1.id if admin1 else None,
+            assigned_team_name="Emergency Response & Fire Team",
+            accepted_by_user_id=worker2.id if worker2 else None,
+            accepted_at=datetime.utcnow(),
+            work_notes="Placed portable canvas screen around welding rig.",
+            evidence_notes="Photo of canvas screen attached.",
+            submitted_for_verification_at=datetime.utcnow(),
+            rework_reason="Standard canvas screen is not NFPA-certified hot work fire blanket; spark gap left near lower cable tray. Reinstall certified silicone-coated fiberglass barrier with zero gap before work permits can be approved.",
+            rework_requested_at=datetime.utcnow(),
+            due_date="2026-10-12"
+        )
+        db.add(t5)
+
+    db.commit()
+
 
 
